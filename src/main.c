@@ -2,7 +2,11 @@
 #include "pebble_app.h"
 #include "pebble_fonts.h"
 
-
+/*   ------- Config Secion -------     */
+#define USE_SECONDS false
+/*   ----- End Config Secion -----     */
+	
+	
 #define MY_UUID { 0xE3, 0x2A, 0x8B, 0xDA, 0xE8, 0x2D, 0x45, 0x17, 0xA6, 0x9D, 0xA9, 0x29, 0x63, 0xFA, 0x84, 0x20 }
 
 PBL_APP_INFO(MY_UUID,
@@ -14,16 +18,16 @@ PBL_APP_INFO(MY_UUID,
 const GColor BackgroundColor = GColorBlack;
 const GColor ForegroundColor = GColorWhite;
 static const GPathInfo HOUR_HAND_POINTS = {
-	.num_points = 3,
-	.points = (GPoint []) {{(int)-144*.05, 0}, {0, (int)-144/3}, {(int)144*.05, 0}}
+	.num_points = 5,
+	.points = (GPoint []) {{(int)-144*.05, 144*.1}, {(int)-144*.05, 0}, {0, (int)-144/3}, {(int)144*.05, 0}, {(int)144*.05, 144*.1}}
 };
 static const GPathInfo MINUTE_HAND_POINTS = {
-	.num_points = 3,
-	.points = (GPoint []) {{(int)-144*.05, 0}, {0, (int)-144/2.2}, {(int)144*.05, 0}}
+	.num_points = 5,
+	.points = (GPoint []) {{(int)-144*.05, 144*.1}, {(int)-144*.05, 0}, {0, (int)-144/2.2}, {(int)144*.05, 0}, {(int)144*.05, 144*.1}}
 };
 static const GPathInfo SECOND_HAND_POINTS = {
 	.num_points = 3,
-	.points = (GPoint []) {{-1, 0}, {-1, (int)-144/2.2}, {1, (int)-144/2.2}, {1, 0}}
+	.points = (GPoint []) {{-1, 144*.1}, {-1, (int)-144/2.2}, {1, (int)-144/2.2}, {1, 144*.1}}
 };
 
 
@@ -32,6 +36,7 @@ Layer watch_face_layer;
 Layer hour_layer;
 Layer minute_layer;
 Layer second_layer;
+Layer hand_pin_layer;
 GPath hour_hand;
 GPath minute_hand;
 GPath second_hand;
@@ -53,6 +58,27 @@ void draw_watch_face(Layer *layer, GContext *ctx) {
 	graphics_fill_circle(ctx, grect_center_point(&layer_rect), layer_radius);
 	if (layer_radius > 2) {
 		graphics_draw_circle(ctx, grect_center_point(&layer_rect), (layer_radius - 2));
+	}
+}
+
+void draw_hand_pin(Layer *layer, GContext *ctx) {
+	graphics_context_set_fill_color(ctx, BackgroundColor);
+	graphics_context_set_stroke_color(ctx, ForegroundColor);
+
+	//Main circle for watch face
+	GRect layer_rect = layer_get_bounds(layer);
+	GPoint center_point = grect_center_point(&layer_rect);
+	int layer_radius;
+	if (layer_rect.size.w < layer_rect.size.w) {
+		layer_radius = (layer_rect.size.w/2) * .05;
+	} else {
+		layer_radius = (layer_rect.size.w/2) * .05;
+	}
+	
+	//Draw Hand Pin
+	center_point.y = center_point.y - 14;
+	if (layer_radius > 2) {
+		graphics_draw_circle(ctx, center_point, layer_radius);
 	}
 }
 
@@ -130,6 +156,8 @@ void handle_tick(AppContextRef ctx, PebbleTickEvent *tickE) {
   	if (tickE->units_changed == 0 || tickE->units_changed & SECOND_UNIT) {
         layer_mark_dirty(&second_layer);
 	}
+	//Always redraw the hand pin
+	layer_mark_dirty(&hand_pin_layer);
 }
 
 void handle_init(AppContextRef ctx) {
@@ -159,12 +187,19 @@ void handle_init(AppContextRef ctx) {
 	gpath_init(&minute_hand, &MINUTE_HAND_POINTS);
 	gpath_move_to(&minute_hand, GPoint((int)(144/2), (int)(144/2) - 14));
 	
+#if USE_SECONDS
 	//Second Hand
 	layer_init(&second_layer, watch_face_layer.frame);
 	second_layer.update_proc = draw_second_hand;
 	layer_add_child(&watch_face_layer, &second_layer);
 	gpath_init(&second_hand, &SECOND_HAND_POINTS);
 	gpath_move_to(&second_hand, GPoint((int)(144/2), (int)(144/2) - 14));
+#endif
+	
+	//Hand Pin
+	layer_init(&hand_pin_layer, watch_face_layer.frame);
+	hand_pin_layer.update_proc = draw_hand_pin;
+	layer_add_child(&watch_face_layer, &hand_pin_layer);
 
 }
 
@@ -173,7 +208,11 @@ void pbl_main(void *params) {
 		.init_handler = &handle_init,
 		.tick_info = {
 			.tick_handler = &handle_tick,
+#if USE_SECONDS
 			.tick_units = SECOND_UNIT | MINUTE_UNIT | HOUR_UNIT | DAY_UNIT
+#else
+			.tick_units = MINUTE_UNIT | HOUR_UNIT | DAY_UNIT
+#endif
 		}
 	};
 	app_event_loop(params, &handlers);
