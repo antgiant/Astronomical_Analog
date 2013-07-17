@@ -29,7 +29,9 @@ static const GPathInfo SECOND_HAND_POINTS = {
 
 Window window;
 Layer watch_face_layer;
-Layer time_layer;
+Layer hour_layer;
+Layer minute_layer;
+Layer second_layer;
 GPath hour_hand;
 GPath minute_hand;
 GPath second_hand;
@@ -54,28 +56,80 @@ void draw_watch_face(Layer *layer, GContext *ctx) {
 	}
 }
 
-void draw_time_layer(Layer *layer, GContext *ctx) {
+void draw_hour_hand(Layer *layer, GContext *ctx) {
+    PblTm t;
+	int hour;
+
 	graphics_context_set_fill_color(ctx, ForegroundColor);
 	graphics_context_set_stroke_color(ctx, BackgroundColor);
 
-	gpath_init(&hour_hand, &HOUR_HAND_POINTS);
-	gpath_move_to(&hour_hand, GPoint((int)(144/2), (int)(144/2)));
-gpath_rotate_to(&hour_hand, (TRIG_MAX_ANGLE / 360) * 100);
+    get_time(&t);
+	hour = t.tm_hour;
+
+	if(!clock_is_24h_style()) {
+		hour = hour%12;
+		if(hour == 0) hour=12;
+	}
+	
+	//Rotate hour hand to to proper spot (30 degrees per hour)
+	gpath_rotate_to(&hour_hand, (TRIG_MAX_ANGLE / 360) * 30 * hour);
+	
 	gpath_draw_filled(ctx, &hour_hand);
 	gpath_draw_outline(ctx, &hour_hand);
+}
+
+void draw_minute_hand(Layer *layer, GContext *ctx) {
+    PblTm t;
+	int minute;
+
+	graphics_context_set_fill_color(ctx, ForegroundColor);
+	graphics_context_set_stroke_color(ctx, BackgroundColor);
+
+    get_time(&t);
+	minute = t.tm_min;
 	
-	gpath_init(&minute_hand, &MINUTE_HAND_POINTS);
-	gpath_move_to(&minute_hand, GPoint((int)(144/2), (int)(144/2)));
-gpath_rotate_to(&minute_hand, (TRIG_MAX_ANGLE / 360) * 180);
+	//Rotate minute hand to to proper spot (6 degrees per minute)
+	gpath_rotate_to(&minute_hand, (TRIG_MAX_ANGLE / 360) * 6 * minute);
+	
 	gpath_draw_filled(ctx, &minute_hand);
 	gpath_draw_outline(ctx, &minute_hand);
+}
+
+void draw_second_hand(Layer *layer, GContext *ctx) {
+    PblTm t;
+	int second;
+
+	graphics_context_set_fill_color(ctx, ForegroundColor);
+	graphics_context_set_stroke_color(ctx, BackgroundColor);
+
+    get_time(&t);
+	second = t.tm_sec;
 	
-	gpath_init(&second_hand, &SECOND_HAND_POINTS);
-	gpath_move_to(&second_hand, GPoint((int)(144/2), (int)(144/2)));
-gpath_rotate_to(&second_hand, (TRIG_MAX_ANGLE / 360) * 250);
+	//Rotate second hand to to proper spot (6 degrees per second)
+	gpath_rotate_to(&second_hand, (TRIG_MAX_ANGLE / 360) * 6 * second);
+	
 	gpath_draw_filled(ctx, &second_hand);
 	gpath_draw_outline(ctx, &second_hand);
+}
 
+/* handle_tick is called at every time change. It updates 
+   things appropriately*/
+void handle_tick(AppContextRef ctx, PebbleTickEvent *tickE) {
+
+	//NOTE: This is a Bit Mask Check not a and &&
+	//Secondary Note: tickE->units_changed == 0 catches initialzation tick
+  	if (tickE->units_changed == 0 || tickE->units_changed & DAY_UNIT) {
+	  	// Update Day Layers
+	}
+  	if (tickE->units_changed == 0 || tickE->units_changed & HOUR_UNIT) {
+        layer_mark_dirty(&hour_layer);
+	}
+  	if (tickE->units_changed == 0 || tickE->units_changed & MINUTE_UNIT) {
+        layer_mark_dirty(&minute_layer);
+	}
+  	if (tickE->units_changed == 0 || tickE->units_changed & SECOND_UNIT) {
+        layer_mark_dirty(&second_layer);
+	}
 }
 
 void handle_init(AppContextRef ctx) {
@@ -86,20 +140,41 @@ void handle_init(AppContextRef ctx) {
 	window_set_background_color(&window, BackgroundColor);
 
 	/* Main Watch Face */
-	layer_init(&watch_face_layer, GRect(0, 0, 144, 168));
+	layer_init(&watch_face_layer, GRect(0, 14, 144, 144));
 	watch_face_layer.update_proc = draw_watch_face;
 	layer_add_child(&window.layer, &watch_face_layer);
 	
 	/* Time (aka Clock Hands) */
-	layer_init(&time_layer, watch_face_layer.frame);
-	time_layer.update_proc = draw_time_layer;
-	layer_add_child(&watch_face_layer, &time_layer);
-}
+	//Hour Hand
+	layer_init(&hour_layer, watch_face_layer.frame);
+	hour_layer.update_proc = draw_hour_hand;
+	layer_add_child(&watch_face_layer, &hour_layer);
+	gpath_init(&hour_hand, &HOUR_HAND_POINTS);
+	gpath_move_to(&hour_hand, GPoint((int)(144/2), (int)(144/2)));
+	
+	//Minute Hand
+	layer_init(&minute_layer, watch_face_layer.frame);
+	minute_layer.update_proc = draw_minute_hand;
+	layer_add_child(&watch_face_layer, &minute_layer);
+	gpath_init(&minute_hand, &MINUTE_HAND_POINTS);
+	gpath_move_to(&minute_hand, GPoint((int)(144/2), (int)(144/2)));
+	
+	//Second Hand
+	layer_init(&second_layer, watch_face_layer.frame);
+	second_layer.update_proc = draw_second_hand;
+	layer_add_child(&watch_face_layer, &second_layer);
+	gpath_init(&second_hand, &SECOND_HAND_POINTS);
+	gpath_move_to(&second_hand, GPoint((int)(144/2), (int)(144/2)));
 
+}
 
 void pbl_main(void *params) {
 	PebbleAppHandlers handlers = {
-		.init_handler = &handle_init
+		.init_handler = &handle_init,
+		.tick_info = {
+			.tick_handler = &handle_tick,
+			.tick_units = SECOND_UNIT | MINUTE_UNIT | HOUR_UNIT | DAY_UNIT
+		}
 	};
 	app_event_loop(params, &handlers);
 }
