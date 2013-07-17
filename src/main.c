@@ -4,6 +4,7 @@
 
 /*   ------- Config Secion -------     */
 #define USE_SECONDS false
+#define INVERTED true
 /*   ----- End Config Secion -----     */
 	
 	
@@ -15,9 +16,15 @@ PBL_APP_INFO(MY_UUID,
              DEFAULT_MENU_ICON,
              APP_INFO_WATCH_FACE);
 
+#if !INVERTED
 const GColor BackgroundColor = GColorBlack;
 const GColor ForegroundColor = GColorWhite;
-static const GPathInfo HOUR_HAND_POINTS = {
+#else
+const GColor BackgroundColor = GColorWhite;
+const GColor ForegroundColor = GColorBlack;
+#endif
+
+	static const GPathInfo HOUR_HAND_POINTS = {
 	.num_points = 5,
 	.points = (GPoint []) {{(int)-144*.05, 144*.1}, {(int)-144*.05, 0}, {0, (int)-144/3}, {(int)144*.05, 0}, {(int)144*.05, 144*.1}}
 };
@@ -165,7 +172,12 @@ void handle_init(AppContextRef ctx) {
 
 	window_init(&window, "Astronomical Analog");
 	window_stack_push(&window, true /* Animated */);
+	
+#if !INVERTED
 	window_set_background_color(&window, BackgroundColor);
+#else
+	window_set_background_color(&window, ForegroundColor);
+#endif
 
 	/* Main Watch Face */
 	layer_init(&watch_face_layer, GRect(0, 14, 144, 144));
