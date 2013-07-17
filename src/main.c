@@ -60,8 +60,8 @@ void draw_hour_hand(Layer *layer, GContext *ctx) {
     PblTm t;
 	int hour;
 
-	graphics_context_set_fill_color(ctx, ForegroundColor);
-	graphics_context_set_stroke_color(ctx, BackgroundColor);
+	graphics_context_set_fill_color(ctx, BackgroundColor);
+	graphics_context_set_stroke_color(ctx, ForegroundColor);
 
     get_time(&t);
 	hour = t.tm_hour;
@@ -82,8 +82,8 @@ void draw_minute_hand(Layer *layer, GContext *ctx) {
     PblTm t;
 	int minute;
 
-	graphics_context_set_fill_color(ctx, ForegroundColor);
-	graphics_context_set_stroke_color(ctx, BackgroundColor);
+	graphics_context_set_fill_color(ctx, BackgroundColor);
+	graphics_context_set_stroke_color(ctx, ForegroundColor);
 
     get_time(&t);
 	minute = t.tm_min;
@@ -99,8 +99,8 @@ void draw_second_hand(Layer *layer, GContext *ctx) {
     PblTm t;
 	int second;
 
-	graphics_context_set_fill_color(ctx, ForegroundColor);
-	graphics_context_set_stroke_color(ctx, BackgroundColor);
+	graphics_context_set_fill_color(ctx, BackgroundColor);
+	graphics_context_set_stroke_color(ctx, ForegroundColor);
 
     get_time(&t);
 	second = t.tm_sec;
@@ -150,21 +150,21 @@ void handle_init(AppContextRef ctx) {
 	hour_layer.update_proc = draw_hour_hand;
 	layer_add_child(&watch_face_layer, &hour_layer);
 	gpath_init(&hour_hand, &HOUR_HAND_POINTS);
-	gpath_move_to(&hour_hand, GPoint((int)(144/2), (int)(144/2)));
+	gpath_move_to(&hour_hand, GPoint((int)(144/2), (int)(144/2) - 14));
 	
 	//Minute Hand
 	layer_init(&minute_layer, watch_face_layer.frame);
 	minute_layer.update_proc = draw_minute_hand;
 	layer_add_child(&watch_face_layer, &minute_layer);
 	gpath_init(&minute_hand, &MINUTE_HAND_POINTS);
-	gpath_move_to(&minute_hand, GPoint((int)(144/2), (int)(144/2)));
+	gpath_move_to(&minute_hand, GPoint((int)(144/2), (int)(144/2) - 14));
 	
 	//Second Hand
 	layer_init(&second_layer, watch_face_layer.frame);
 	second_layer.update_proc = draw_second_hand;
 	layer_add_child(&watch_face_layer, &second_layer);
 	gpath_init(&second_hand, &SECOND_HAND_POINTS);
-	gpath_move_to(&second_hand, GPoint((int)(144/2), (int)(144/2)));
+	gpath_move_to(&second_hand, GPoint((int)(144/2), (int)(144/2) - 14));
 
 }
 
