@@ -23,7 +23,7 @@ static const GPathInfo MINUTE_HAND_POINTS = {
 };
 static const GPathInfo SECOND_HAND_POINTS = {
 	.num_points = 3,
-	.points = (GPoint []) {{-1.5, 0}, {-1.5, (int)-144/2.2}, {1.5, (int)-144/2.2}, {1.5, 0}}
+	.points = (GPoint []) {{-1, 0}, {-1, (int)-144/2.2}, {1, (int)-144/2.2}, {1, 0}}
 };
 
 
@@ -100,7 +100,7 @@ void draw_second_hand(Layer *layer, GContext *ctx) {
 	int second;
 
 	graphics_context_set_fill_color(ctx, BackgroundColor);
-	graphics_context_set_stroke_color(ctx, ForegroundColor);
+	graphics_context_set_stroke_color(ctx, BackgroundColor);
 
     get_time(&t);
 	second = t.tm_sec;
