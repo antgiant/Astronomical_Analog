@@ -6,6 +6,7 @@
 #define SHOW_SECONDS false
 #define SHOW_DATE true
 #define SHOW_RING false
+#define LOW_RES_HOUR_HAND false
 #define INVERTED true
 /*   ----- End Config Secion -----     */
 	
@@ -28,11 +29,11 @@ const GColor ForegroundColor = GColorBlack;
 
 	static const GPathInfo HOUR_HAND_POINTS = {
 	.num_points = 5,
-	.points = (GPoint []) {{-7, 14}, {-7, 0}, {0, -48}, {7, 0}, {7, 14}}
+	.points = (GPoint []) {{-5, 14}, {-5, 0}, {0, -48}, {5, 0}, {5, 14}}
 };
 static const GPathInfo MINUTE_HAND_POINTS = {
 	.num_points = 5,
-	.points = (GPoint []) {{-7, 14}, {-7, 0}, {0, -65}, {7, 0}, {7, 14}}
+	.points = (GPoint []) {{-5, 14}, {-5, 0}, {0, -65}, {5, 0}, {5, 14}}
 };
 static const GPathInfo SECOND_HAND_POINTS = {
 	.num_points = 3,
@@ -85,30 +86,32 @@ void draw_hand_pin(Layer *layer, GContext *ctx) {
 	//Main circle for watch face
 	GRect layer_rect = layer_get_bounds(layer);
 	GPoint center_point = grect_center_point(&layer_rect);
-	int layer_radius = 4;
+	int layer_radius;
 	
 	//Draw Hand Pin
 	center_point.y = center_point.y - 14;
+	layer_radius = 2;
 	graphics_draw_circle(ctx, center_point, layer_radius);
 }
 
 void draw_hour_hand(Layer *layer, GContext *ctx) {
     PblTm t;
-	int hour;
+	int hour, minute;
 
 	graphics_context_set_fill_color(ctx, BackgroundColor);
 	graphics_context_set_stroke_color(ctx, ForegroundColor);
 
     get_time(&t);
 	hour = t.tm_hour;
+	minute = t.tm_min;
 
 	if(!clock_is_24h_style()) {
 		hour = hour%12;
 		if(hour == 0) hour=12;
 	}
 	
-	//Rotate hour hand to to proper spot (30 degrees per hour)
-	gpath_rotate_to(&hour_hand, (TRIG_MAX_ANGLE / 360) * 30 * hour);
+	//Rotate hour hand to to proper spot (30 degrees per hour + 1 degree per 2 minutes)
+	gpath_rotate_to(&hour_hand, (TRIG_MAX_ANGLE / 360) * 30 * (hour + (minute/2/30)));
 	
 	gpath_draw_filled(ctx, &hour_hand);
 	gpath_draw_outline(ctx, &hour_hand);
@@ -159,11 +162,21 @@ void handle_tick(AppContextRef ctx, PebbleTickEvent *tickE) {
         draw_date();
 	}
 #endif
+	
+//No need to seperatly update hour hand if done by minute hand
+#if LOW_RES_HOUR_HAND
   	if (tickE->units_changed == 0 || tickE->units_changed & HOUR_UNIT) {
         layer_mark_dirty(&hour_layer);
 	}
-  	if (tickE->units_changed == 0 || tickE->units_changed & MINUTE_UNIT) {
+#endif
+	if (tickE->units_changed == 0 || tickE->units_changed & MINUTE_UNIT) {
         layer_mark_dirty(&minute_layer);
+#if !LOW_RES_HOUR_HAND
+		//Only move hour hand every two minutes (due to 2 minutes per degree rotation).
+		if (tickE->units_changed == 0 || tickE->tick_time->tm_min%2 == 0) {
+        	layer_mark_dirty(&hour_layer);
+		}
+#endif
 	}
 #if SHOW_SECONDS
   	if (tickE->units_changed == 0 || tickE->units_changed & SECOND_UNIT) {
@@ -193,30 +206,16 @@ void handle_init(AppContextRef ctx) {
 
 #if SHOW_DATE
 	/* Date */
-	text_layer_init(&date_layer, GRect(62, 102, 20, 20));
-	text_layer_set_font(&date_layer, fonts_get_system_font(FONT_KEY_GOTHIC_18));
+	text_layer_init(&date_layer, GRect((int)(144/2 - 15), (int)(144/2 + 20), 30, 30));
+	text_layer_set_font(&date_layer, fonts_get_system_font(FONT_KEY_GOTHIC_24_BOLD));
 	text_layer_set_text_alignment(&date_layer, GTextAlignmentCenter);
 	text_layer_set_text_color(&date_layer, BackgroundColor);
-	text_layer_set_background_color(&date_layer, ForegroundColor);//GColorClear);
+	text_layer_set_background_color(&date_layer, GColorClear);
 	layer_add_child(&watch_face_layer, &date_layer.layer);	
 	draw_date();
 #endif
 	
 	/* Time (aka Clock Hands) */
-	//Hour Hand
-	layer_init(&hour_layer, watch_face_layer.frame);
-	hour_layer.update_proc = draw_hour_hand;
-	layer_add_child(&watch_face_layer, &hour_layer);
-	gpath_init(&hour_hand, &HOUR_HAND_POINTS);
-	gpath_move_to(&hour_hand, GPoint(72, 58));
-	
-	//Minute Hand
-	layer_init(&minute_layer, watch_face_layer.frame);
-	minute_layer.update_proc = draw_minute_hand;
-	layer_add_child(&watch_face_layer, &minute_layer);
-	gpath_init(&minute_hand, &MINUTE_HAND_POINTS);
-	gpath_move_to(&minute_hand, GPoint(72, 58));
-	
 #if SHOW_SECONDS
 	//Second Hand
 	layer_init(&second_layer, watch_face_layer.frame);
@@ -225,6 +224,20 @@ void handle_init(AppContextRef ctx) {
 	gpath_init(&second_hand, &SECOND_HAND_POINTS);
 	gpath_move_to(&second_hand, GPoint(72, 58));
 #endif
+
+	//Minute Hand
+	layer_init(&minute_layer, watch_face_layer.frame);
+	minute_layer.update_proc = draw_minute_hand;
+	layer_add_child(&watch_face_layer, &minute_layer);
+	gpath_init(&minute_hand, &MINUTE_HAND_POINTS);
+	gpath_move_to(&minute_hand, GPoint(72, 58));
+	
+	//Hour Hand
+	layer_init(&hour_layer, watch_face_layer.frame);
+	hour_layer.update_proc = draw_hour_hand;
+	layer_add_child(&watch_face_layer, &hour_layer);
+	gpath_init(&hour_hand, &HOUR_HAND_POINTS);
+	gpath_move_to(&hour_hand, GPoint(72, 58));
 	
 	//Hand Pin
 	layer_init(&hand_pin_layer, watch_face_layer.frame);
