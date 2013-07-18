@@ -3,7 +3,9 @@
 #include "pebble_fonts.h"
 
 /*   ------- Config Secion -------     */
-#define USE_SECONDS false
+#define SHOW_SECONDS false
+#define SHOW_DATE true
+#define SHOW_RING false
 #define INVERTED true
 /*   ----- End Config Secion -----     */
 	
@@ -26,15 +28,15 @@ const GColor ForegroundColor = GColorBlack;
 
 	static const GPathInfo HOUR_HAND_POINTS = {
 	.num_points = 5,
-	.points = (GPoint []) {{(int)-144*.05, 144*.1}, {(int)-144*.05, 0}, {0, (int)-144/3}, {(int)144*.05, 0}, {(int)144*.05, 144*.1}}
+	.points = (GPoint []) {{-7, 14}, {-7, 0}, {0, -48}, {7, 0}, {7, 14}}
 };
 static const GPathInfo MINUTE_HAND_POINTS = {
 	.num_points = 5,
-	.points = (GPoint []) {{(int)-144*.05, 144*.1}, {(int)-144*.05, 0}, {0, (int)-144/2.2}, {(int)144*.05, 0}, {(int)144*.05, 144*.1}}
+	.points = (GPoint []) {{-7, 14}, {-7, 0}, {0, -65}, {7, 0}, {7, 14}}
 };
 static const GPathInfo SECOND_HAND_POINTS = {
 	.num_points = 3,
-	.points = (GPoint []) {{-1, 144*.1}, {-1, (int)-144/2.2}, {1, (int)-144/2.2}, {1, 144*.1}}
+	.points = (GPoint []) {{-1, 14}, {-1, -65}}
 };
 
 
@@ -47,6 +49,7 @@ Layer hand_pin_layer;
 GPath hour_hand;
 GPath minute_hand;
 GPath second_hand;
+TextLayer date_layer;
 
 void draw_watch_face(Layer *layer, GContext *ctx) {
 	graphics_context_set_fill_color(ctx, ForegroundColor);
@@ -54,18 +57,25 @@ void draw_watch_face(Layer *layer, GContext *ctx) {
 
 	//Main circle for watch face
 	GRect layer_rect = layer_get_bounds(layer);
-	int layer_radius;
-	if (layer_rect.size.w < layer_rect.size.w) {
-		layer_radius = (layer_rect.size.w/2) - 2;
-	} else {
-		layer_radius = (layer_rect.size.w/2) - 2;
-	}
+	int layer_radius = 70;
 	
 	//Draw Watch Background
 	graphics_fill_circle(ctx, grect_center_point(&layer_rect), layer_radius);
+#if SHOW_RING
 	if (layer_radius > 2) {
 		graphics_draw_circle(ctx, grect_center_point(&layer_rect), (layer_radius - 2));
 	}
+#endif
+}
+
+void draw_date() {
+    PblTm t;
+    get_time(&t);
+	
+	static char dom_text[] = "00";
+	string_format_time(dom_text, sizeof(dom_text), "%e", &t);	
+  
+	text_layer_set_text(&date_layer, dom_text);
 }
 
 void draw_hand_pin(Layer *layer, GContext *ctx) {
@@ -75,18 +85,11 @@ void draw_hand_pin(Layer *layer, GContext *ctx) {
 	//Main circle for watch face
 	GRect layer_rect = layer_get_bounds(layer);
 	GPoint center_point = grect_center_point(&layer_rect);
-	int layer_radius;
-	if (layer_rect.size.w < layer_rect.size.w) {
-		layer_radius = (layer_rect.size.w/2) * .05;
-	} else {
-		layer_radius = (layer_rect.size.w/2) * .05;
-	}
+	int layer_radius = 4;
 	
 	//Draw Hand Pin
 	center_point.y = center_point.y - 14;
-	if (layer_radius > 2) {
-		graphics_draw_circle(ctx, center_point, layer_radius);
-	}
+	graphics_draw_circle(ctx, center_point, layer_radius);
 }
 
 void draw_hour_hand(Layer *layer, GContext *ctx) {
@@ -151,18 +154,22 @@ void handle_tick(AppContextRef ctx, PebbleTickEvent *tickE) {
 
 	//NOTE: This is a Bit Mask Check not a and &&
 	//Secondary Note: tickE->units_changed == 0 catches initialzation tick
-  	if (tickE->units_changed == 0 || tickE->units_changed & DAY_UNIT) {
-	  	// Update Day Layers
+#if SHOW_DATE
+	if (tickE->units_changed == 0 || tickE->units_changed & DAY_UNIT) {
+        draw_date();
 	}
+#endif
   	if (tickE->units_changed == 0 || tickE->units_changed & HOUR_UNIT) {
         layer_mark_dirty(&hour_layer);
 	}
   	if (tickE->units_changed == 0 || tickE->units_changed & MINUTE_UNIT) {
         layer_mark_dirty(&minute_layer);
 	}
+#if SHOW_SECONDS
   	if (tickE->units_changed == 0 || tickE->units_changed & SECOND_UNIT) {
         layer_mark_dirty(&second_layer);
 	}
+#endif
 	//Always redraw the hand pin
 	layer_mark_dirty(&hand_pin_layer);
 }
@@ -183,6 +190,17 @@ void handle_init(AppContextRef ctx) {
 	layer_init(&watch_face_layer, GRect(0, 14, 144, 144));
 	watch_face_layer.update_proc = draw_watch_face;
 	layer_add_child(&window.layer, &watch_face_layer);
+
+#if SHOW_DATE
+	/* Date */
+	text_layer_init(&date_layer, GRect(62, 102, 20, 20));
+	text_layer_set_font(&date_layer, fonts_get_system_font(FONT_KEY_GOTHIC_18));
+	text_layer_set_text_alignment(&date_layer, GTextAlignmentCenter);
+	text_layer_set_text_color(&date_layer, BackgroundColor);
+	text_layer_set_background_color(&date_layer, ForegroundColor);//GColorClear);
+	layer_add_child(&watch_face_layer, &date_layer.layer);	
+	draw_date();
+#endif
 	
 	/* Time (aka Clock Hands) */
 	//Hour Hand
@@ -190,22 +208,22 @@ void handle_init(AppContextRef ctx) {
 	hour_layer.update_proc = draw_hour_hand;
 	layer_add_child(&watch_face_layer, &hour_layer);
 	gpath_init(&hour_hand, &HOUR_HAND_POINTS);
-	gpath_move_to(&hour_hand, GPoint((int)(144/2), (int)(144/2) - 14));
+	gpath_move_to(&hour_hand, GPoint(72, 58));
 	
 	//Minute Hand
 	layer_init(&minute_layer, watch_face_layer.frame);
 	minute_layer.update_proc = draw_minute_hand;
 	layer_add_child(&watch_face_layer, &minute_layer);
 	gpath_init(&minute_hand, &MINUTE_HAND_POINTS);
-	gpath_move_to(&minute_hand, GPoint((int)(144/2), (int)(144/2) - 14));
+	gpath_move_to(&minute_hand, GPoint(72, 58));
 	
-#if USE_SECONDS
+#if SHOW_SECONDS
 	//Second Hand
 	layer_init(&second_layer, watch_face_layer.frame);
 	second_layer.update_proc = draw_second_hand;
 	layer_add_child(&watch_face_layer, &second_layer);
 	gpath_init(&second_hand, &SECOND_HAND_POINTS);
-	gpath_move_to(&second_hand, GPoint((int)(144/2), (int)(144/2) - 14));
+	gpath_move_to(&second_hand, GPoint(72, 58));
 #endif
 	
 	//Hand Pin
@@ -220,10 +238,14 @@ void pbl_main(void *params) {
 		.init_handler = &handle_init,
 		.tick_info = {
 			.tick_handler = &handle_tick,
-#if USE_SECONDS
+#if SHOW_SECONDS && SHOW_DATE
 			.tick_units = SECOND_UNIT | MINUTE_UNIT | HOUR_UNIT | DAY_UNIT
-#else
+#elif SHOW_SECONDS
+			.tick_units = SECOND_UNIT | MINUTE_UNIT | HOUR_UNIT
+#elif SHOW_DATE
 			.tick_units = MINUTE_UNIT | HOUR_UNIT | DAY_UNIT
+#else
+			.tick_units = MINUTE_UNIT | HOUR_UNIT
 #endif
 		}
 	};
