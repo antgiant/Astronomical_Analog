@@ -111,7 +111,7 @@ void draw_hour_hand(Layer *layer, GContext *ctx) {
 	}
 	
 	//Rotate hour hand to to proper spot (30 degrees per hour + 1 degree per 2 minutes)
-	gpath_rotate_to(&hour_hand, (TRIG_MAX_ANGLE / 360) * 30 * (hour + (minute/2/30)));
+	gpath_rotate_to(&hour_hand, (TRIG_MAX_ANGLE / 360) * ((30*hour) + (minute/2)));
 	
 	gpath_draw_filled(ctx, &hour_hand);
 	gpath_draw_outline(ctx, &hour_hand);
