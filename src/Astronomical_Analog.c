@@ -3,11 +3,11 @@
 #include "pebble_fonts.h"
 
 /*   ------- Config Secion -------     */
-#define SHOW_SECONDS true
+#define SHOW_SECONDS false
 #define SHOW_DATE true
 #define SHOW_RING true
 //LOW_RES_TIME means only updating when needed (better for battery assuming pebble is smart enough to only paint changed pixels)
-#define LOW_RES_TIME true
+#define LOW_RES_TIME false
 #define INVERTED true
 /*   ----- End Config Secion -----     */
 	
@@ -91,35 +91,38 @@ void draw_date() {
 
 void draw_orbiting_body(Layer *layer, GContext *ctx) {
     PblTm t;
-	int hour, minute, angle;
+	int hour, angle;
 
-	graphics_context_set_fill_color(ctx, ForegroundColor);
-	graphics_context_set_stroke_color(ctx, BackgroundColor);
+	graphics_context_set_fill_color(ctx, GColorWhite);
+	graphics_context_set_stroke_color(ctx, GColorBlack);
 
     get_time(&t);
 	hour = t.tm_hour%12;
-	minute = t.tm_min;
 	
 
 	//Get info about main circle for watch face
 	GRect layer_rect = layer_get_bounds(layer);
 	GPoint center_point = grect_center_point(&layer_rect);
 	int layer_radius, body_radius;
-	//Fix Offset bug
-//	center_point.y = center_point.y + 7;
-	//This is the radius of said circle.
+
+	//This is the radius of watchface.
 	layer_radius = 70;
 	
 	//Draw Orbiting Body
-	body_radius = 15;
+	body_radius = 7;
 	
+#if LOW_RES_TIME
+	//Rotate orbiting body to proper spot (15 degrees per hour)
+	angle = (15*hour);
+#else
+	int minute;
+	minute = t.tm_min;
 	//Rotate orbiting body to proper spot (15 degrees per hour + 1 degree per 4 minutes)
 	angle = (15*hour) + (minute/4);
+#endif
 	
-	//For Testing make it a second hand
-	angle = 6 * t.tm_sec;
-
-	graphics_draw_circle(ctx, move_by_degrees(center_point, layer_radius - body_radius - 1, angle), body_radius);
+	graphics_fill_circle(ctx, move_by_degrees(center_point, layer_radius - body_radius - 10, angle), body_radius);
+	graphics_draw_circle(ctx, move_by_degrees(center_point, layer_radius - body_radius - 10, angle), body_radius);
 }
 
 void draw_hand_pin(Layer *layer, GContext *ctx) {
@@ -172,8 +175,8 @@ void draw_minute_hand(Layer *layer, GContext *ctx) {
 	minute = t.tm_min;
 	
 
-#if LOW_RES_TIME
-	//Rotate minute hand to to proper spot (6 degrees per minute + 1 degree per 10 seconds)
+#if LOW_RES_TIME || !SHOW_SECONDS
+	//Rotate minute hand to to proper spot (6 degrees per minute)
 	gpath_rotate_to(&minute_hand, (TRIG_MAX_ANGLE / 360) * (6*minute));
 #else
 	int second;
