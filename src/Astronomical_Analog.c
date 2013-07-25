@@ -3,10 +3,11 @@
 #include "pebble_fonts.h"
 
 /*   ------- Config Secion -------     */
-#define SHOW_SECONDS false
+#define SHOW_SECONDS true
 #define SHOW_DATE true
-#define SHOW_RING false
-#define LOW_RES_HOUR_HAND false
+#define SHOW_RING true
+//LOW_RES_TIME means only updating when needed (better for battery assuming pebble is smart enough to only paint changed pixels)
+#define LOW_RES_TIME true
 #define INVERTED true
 /*   ----- End Config Secion -----     */
 	
@@ -47,10 +48,19 @@ Layer hour_layer;
 Layer minute_layer;
 Layer second_layer;
 Layer hand_pin_layer;
+Layer orbiting_body_layer;
 GPath hour_hand;
 GPath minute_hand;
 GPath second_hand;
 TextLayer date_layer;
+
+//Provides the ability to move something in a circle by degrees (0 = Top center)
+GPoint move_by_degrees(GPoint origin, int radius, int degrees) {
+	GPoint newOrigin = origin;
+	newOrigin.y = (-cos_lookup(TRIG_MAX_ANGLE * degrees / 360) * radius / TRIG_MAX_RATIO) + origin.y;
+	newOrigin.x = (sin_lookup(TRIG_MAX_ANGLE * degrees / 360) * radius / TRIG_MAX_RATIO) + origin.x;
+	return newOrigin;
+}
 
 void draw_watch_face(Layer *layer, GContext *ctx) {
 	graphics_context_set_fill_color(ctx, ForegroundColor);
@@ -77,6 +87,39 @@ void draw_date() {
 	string_format_time(dom_text, sizeof(dom_text), "%e", &t);	
   
 	text_layer_set_text(&date_layer, dom_text);
+}
+
+void draw_orbiting_body(Layer *layer, GContext *ctx) {
+    PblTm t;
+	int hour, minute, angle;
+
+	graphics_context_set_fill_color(ctx, ForegroundColor);
+	graphics_context_set_stroke_color(ctx, BackgroundColor);
+
+    get_time(&t);
+	hour = t.tm_hour%12;
+	minute = t.tm_min;
+	
+
+	//Get info about main circle for watch face
+	GRect layer_rect = layer_get_bounds(layer);
+	GPoint center_point = grect_center_point(&layer_rect);
+	int layer_radius, body_radius;
+	//Fix Offset bug
+//	center_point.y = center_point.y + 7;
+	//This is the radius of said circle.
+	layer_radius = 70;
+	
+	//Draw Orbiting Body
+	body_radius = 15;
+	
+	//Rotate orbiting body to proper spot (15 degrees per hour + 1 degree per 4 minutes)
+	angle = (15*hour) + (minute/4);
+	
+	//For Testing make it a second hand
+	angle = 6 * t.tm_sec;
+
+	graphics_draw_circle(ctx, move_by_degrees(center_point, layer_radius - body_radius - 1, angle), body_radius);
 }
 
 void draw_hand_pin(Layer *layer, GContext *ctx) {
@@ -186,6 +229,10 @@ void handle_tick(AppContextRef ctx, PebbleTickEvent *tickE) {
 		//Only move hour hand every two minutes (due to 2 minutes per degree rotation).
 		if (tickE->units_changed == 0 || tickE->tick_time->tm_min%2 == 0) {
         	layer_mark_dirty(&hour_layer);
+	  		//Only move orb every 4 minutes (due to 4 minutes per degree rotation)
+			if (tickE->tick_time->tm_min%4 == 0) {
+				layer_mark_dirty(&orbiting_body_layer);
+			}
 		}
   #endif
 	}
@@ -201,6 +248,10 @@ void handle_tick(AppContextRef ctx, PebbleTickEvent *tickE) {
 	  	//Only move hour hand every two minutes (due to 2 minutes per degree rotation).
 		if (tickE->units_changed == 0 || tickE->tick_time->tm_min%2 == 0) {
         	layer_mark_dirty(&hour_layer);
+	  		//Only move orb every 4 minutes (due to 4 minutes per degree rotation)
+			if (tickE->tick_time->tm_min%4 == 0) {
+				layer_mark_dirty(&orbiting_body_layer);
+			}
 		}
   #endif
 	}
@@ -237,6 +288,12 @@ void handle_init(AppContextRef ctx) {
 	draw_date();
 #endif
 	
+	/* Orbiting Body (aka 24 hour analog clock) */
+	layer_init(&orbiting_body_layer, watch_face_layer.frame);
+	orbiting_body_layer.update_proc = draw_orbiting_body;
+	layer_add_child(&watch_face_layer, &orbiting_body_layer);
+	layer_set_frame(&orbiting_body_layer, GRect(0, 0, 144, 144));
+
 	/* Time (aka Clock Hands) */
 #if SHOW_SECONDS
 	//Second Hand
