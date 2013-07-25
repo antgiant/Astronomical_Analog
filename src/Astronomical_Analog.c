@@ -96,16 +96,23 @@ void draw_hand_pin(Layer *layer, GContext *ctx) {
 
 void draw_hour_hand(Layer *layer, GContext *ctx) {
     PblTm t;
-	int hour, minute;
+	int hour;
 
 	graphics_context_set_fill_color(ctx, BackgroundColor);
 	graphics_context_set_stroke_color(ctx, ForegroundColor);
 
     get_time(&t);
-	hour = t.tm_hour;
+	hour = t.tm_hour%12;
+
+#if LOW_RES_TIME
+	//Rotate hour hand to to proper spot (30 degrees per hour)
+	gpath_rotate_to(&hour_hand, (TRIG_MAX_ANGLE / 360) * (30*hour));
+#else
+	int minute;
 	minute = t.tm_min;
 	//Rotate hour hand to to proper spot (30 degrees per hour + 1 degree per 2 minutes)
 	gpath_rotate_to(&hour_hand, (TRIG_MAX_ANGLE / 360) * ((30*hour) + (minute/2)));
+#endif
 	
 	gpath_draw_filled(ctx, &hour_hand);
 	gpath_draw_outline(ctx, &hour_hand);
@@ -121,8 +128,16 @@ void draw_minute_hand(Layer *layer, GContext *ctx) {
     get_time(&t);
 	minute = t.tm_min;
 	
-	//Rotate minute hand to to proper spot (6 degrees per minute)
-	gpath_rotate_to(&minute_hand, (TRIG_MAX_ANGLE / 360) * 6 * minute);
+
+#if LOW_RES_TIME
+	//Rotate minute hand to to proper spot (6 degrees per minute + 1 degree per 10 seconds)
+	gpath_rotate_to(&minute_hand, (TRIG_MAX_ANGLE / 360) * (6*minute));
+#else
+	int second;
+	second = t.tm_sec;
+	//Rotate minute hand to to proper spot (6 degrees per minute + 1 degree per 10 seconds)
+	gpath_rotate_to(&minute_hand, (TRIG_MAX_ANGLE / 360) * ((6*minute) + (second/10)));
+#endif
 	
 	gpath_draw_filled(ctx, &minute_hand);
 	gpath_draw_outline(ctx, &minute_hand);
@@ -157,24 +172,37 @@ void handle_tick(AppContextRef ctx, PebbleTickEvent *tickE) {
 	}
 #endif
 	
-//No need to seperatly update hour hand if done by minute hand
-#if LOW_RES_HOUR_HAND
+//No need to seperatly update hour hand if done by another hand
+#if LOW_RES_TIME
   	if (tickE->units_changed == 0 || tickE->units_changed & HOUR_UNIT) {
         layer_mark_dirty(&hour_layer);
+		layer_mark_dirty(&orbiting_body_layer);
 	}
 #endif
+#if LOW_RES_TIME || !SHOW_SECONDS
 	if (tickE->units_changed == 0 || tickE->units_changed & MINUTE_UNIT) {
         layer_mark_dirty(&minute_layer);
-#if !LOW_RES_HOUR_HAND
+  #if !LOW_RES_TIME
 		//Only move hour hand every two minutes (due to 2 minutes per degree rotation).
 		if (tickE->units_changed == 0 || tickE->tick_time->tm_min%2 == 0) {
         	layer_mark_dirty(&hour_layer);
 		}
-#endif
+  #endif
 	}
+#endif
 #if SHOW_SECONDS
   	if (tickE->units_changed == 0 || tickE->units_changed & SECOND_UNIT) {
         layer_mark_dirty(&second_layer);
+  #if !LOW_RES_TIME
+		//Only move minute hand every two seconds (due to 10 seconds per degree rotation).
+		if (tickE->units_changed == 0 || tickE->tick_time->tm_sec%10 == 0) {
+        	layer_mark_dirty(&minute_layer);
+		}
+	  	//Only move hour hand every two minutes (due to 2 minutes per degree rotation).
+		if (tickE->units_changed == 0 || tickE->tick_time->tm_min%2 == 0) {
+        	layer_mark_dirty(&hour_layer);
+		}
+  #endif
 	}
 #endif
 	//Always redraw the hand pin
@@ -246,13 +274,13 @@ void pbl_main(void *params) {
 		.tick_info = {
 			.tick_handler = &handle_tick,
 #if SHOW_SECONDS && SHOW_DATE
-			.tick_units = SECOND_UNIT | MINUTE_UNIT | HOUR_UNIT | DAY_UNIT
+			.tick_units = SECOND_UNIT | DAY_UNIT
 #elif SHOW_SECONDS
-			.tick_units = SECOND_UNIT | MINUTE_UNIT | HOUR_UNIT
+			.tick_units = SECOND_UNIT
 #elif SHOW_DATE
-			.tick_units = MINUTE_UNIT | HOUR_UNIT | DAY_UNIT
+			.tick_units = MINUTE_UNIT | DAY_UNIT
 #else
-			.tick_units = MINUTE_UNIT | HOUR_UNIT
+			.tick_units = MINUTE_UNIT
 #endif
 		}
 	};
