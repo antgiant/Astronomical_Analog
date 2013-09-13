@@ -1,6 +1,7 @@
 #include "pebble_os.h"
 #include "pebble_app.h"
 #include "pebble_fonts.h"
+#include "spa.h"
 
 /*   ------- Config Secion -------     */
 #define SHOW_SECONDS false
@@ -9,6 +10,7 @@
 //LOW_RES_TIME means only updating when needed (better for battery assuming pebble is smart enough to only paint changed pixels)
 #define LOW_RES_TIME false
 #define INVERTED true
+#define EAST_TO_WEST_ORB_ROTATION true //as opposed to clockwise
 /*   ----- End Config Secion -----     */
 	
 	
@@ -96,9 +98,9 @@ void draw_orbiting_body(Layer *layer, GContext *ctx) {
 	graphics_context_set_fill_color(ctx, GColorWhite);
 	graphics_context_set_stroke_color(ctx, GColorBlack);
 
-    get_time(&t);
-	hour = t.tm_hour%12;
-	
+        get_time(&t);
+        //Offset by 12 hours so top half is day and bottom half is night.
+	hour = (t.tm_hour + 12)%24;
 
 	//Get info about main circle for watch face
 	GRect layer_rect = layer_get_bounds(layer);
@@ -120,7 +122,9 @@ void draw_orbiting_body(Layer *layer, GContext *ctx) {
 	//Rotate orbiting body to proper spot (15 degrees per hour + 1 degree per 4 minutes)
 	angle = (15*hour) + (minute/4);
 #endif
-	
+#if EAST_TO_WEST_ORB_ROTATION
+        angle = -(angle - 360);
+#endif	
 	graphics_fill_circle(ctx, move_by_degrees(center_point, layer_radius - body_radius - 10, angle), body_radius);
 	graphics_draw_circle(ctx, move_by_degrees(center_point, layer_radius - body_radius - 10, angle), body_radius);
 }
@@ -325,6 +329,35 @@ void handle_init(AppContextRef ctx) {
 	layer_init(&hand_pin_layer, watch_face_layer.frame);
 	hand_pin_layer.update_proc = draw_hand_pin;
 	layer_add_child(&watch_face_layer, &hand_pin_layer);
+	
+	spa_data spa;  //declare the SPA structure
+    //int result;
+    //float min, sec;
+
+    //enter required input values into SPA structure
+
+    spa.year          = 2003;
+    spa.month         = 10;
+    spa.day           = 17;
+    spa.hour          = 12;
+    spa.minute        = 30;
+    spa.second        = 30;
+    spa.timezone      = -7.0;
+    spa.delta_ut1     = 0;
+    spa.delta_t       = 67;
+    spa.longitude     = -105.1786;
+    spa.latitude      = 39.742476;
+    spa.elevation     = 1830.14;
+    spa.pressure      = 820;
+    spa.temperature   = 11;
+    spa.slope         = 30;
+    spa.azm_rotation  = -10;
+    spa.atmos_refract = 0.5667;
+    spa.function      = SPA_ALL;
+
+    //call the SPA calculate function and pass the SPA structure
+
+    spa_calculate(&spa);
 
 }
 
