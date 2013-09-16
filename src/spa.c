@@ -1,4 +1,5 @@
 
+#include "my_math.h"
 
 /////////////////////////////////////////////
 //      Solar Position Algorithm (SPA)     //
@@ -681,7 +682,7 @@ double earth_values(double term_sum[], int count, double jme)
     double sum=0;
 
     for (i = 0; i < count; i++)
-        sum += term_sum[i]*pow(jme, i);
+        sum += term_sum[i]*my_pow(jme, i);
 
     sum /= 1.0e8;
 
@@ -838,7 +839,7 @@ double geocentric_declination(double beta, double epsilon, double lamda)
     double beta_rad    = deg2rad(beta);
     double epsilon_rad = deg2rad(epsilon);
 
-    return rad2deg(asin(sin(beta_rad)*cos(epsilon_rad) +
+    return rad2deg(my_asin(sin(beta_rad)*cos(epsilon_rad) +
                         cos(beta_rad)*sin(epsilon_rad)*sin(deg2rad(lamda))));
 }
 
@@ -888,7 +889,7 @@ double topocentric_elevation_angle(double latitude, double delta_prime, double h
     double lat_rad         = deg2rad(latitude);
     double delta_prime_rad = deg2rad(delta_prime);
 
-    return rad2deg(asin(sin(lat_rad)*sin(delta_prime_rad) +
+    return rad2deg(my_asin(sin(lat_rad)*sin(delta_prime_rad) +
                         cos(lat_rad)*cos(delta_prime_rad) * cos(deg2rad(h_prime))));
 }
 
@@ -934,7 +935,7 @@ double surface_incidence_angle(double zenith, double azimuth180, double azm_rota
     double zenith_rad = deg2rad(zenith);
     double slope_rad  = deg2rad(slope);
 
-    return rad2deg(acos(cos(zenith_rad)*cos(slope_rad)  +
+    return rad2deg(my_acos(cos(zenith_rad)*cos(slope_rad)  +
                         sin(slope_rad )*sin(zenith_rad) * cos(deg2rad(azimuth180 - azm_rotation))));
 }
 
@@ -962,7 +963,7 @@ double sun_hour_angle_at_rise_set(double latitude, double delta_zero, double h0_
     double argument       = (sin(deg2rad(h0_prime)) - sin(latitude_rad)*sin(delta_zero_rad)) /
                                                      (cos(latitude_rad)*cos(delta_zero_rad));
 
-    if (fabs(argument) <= 1) h0 = limit_degrees180(rad2deg(acos(argument)));
+    if (fabs(argument) <= 1) h0 = limit_degrees180(rad2deg(my_acos(argument)));
 
     return h0;
 }
@@ -992,7 +993,7 @@ double rts_sun_altitude(double latitude, double delta_prime, double h_prime)
     double latitude_rad    = deg2rad(latitude);
     double delta_prime_rad = deg2rad(delta_prime);
 
-    return rad2deg(asin(sin(latitude_rad)*sin(delta_prime_rad) +
+    return rad2deg(my_asin(sin(latitude_rad)*sin(delta_prime_rad) +
                         cos(latitude_rad)*cos(delta_prime_rad)*cos(deg2rad(h_prime))));
 }
 

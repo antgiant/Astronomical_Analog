@@ -9,3 +9,4 @@ float my_cos(float x);
 float my_acos (float x);
 float my_asin (float x);
 float my_tan(float x);
+double my_pow(double x, int y);

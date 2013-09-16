@@ -138,3 +138,11 @@ float my_tan(float x)
 {
   return my_sin(x) / my_cos(x);
 }
+
+double my_pow(double x, int y)
+{
+	double out = 1;
+    for (int i = 0; i < y; i++)
+        out *= x;
+	return (out);
+}
