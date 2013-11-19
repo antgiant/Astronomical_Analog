@@ -1,7 +1,7 @@
 #include "pebble_os.h"
 #include "pebble_app.h"
 #include "pebble_fonts.h"
-#include "spa.h"
+#include "suncalc.h"
 
 /*   ------- Config Secion -------     */
 #define SHOW_SECONDS false
@@ -330,34 +330,12 @@ void handle_init(AppContextRef ctx) {
 	hand_pin_layer.update_proc = draw_hand_pin;
 	layer_add_child(&watch_face_layer, &hand_pin_layer);
 	
-	spa_data spa;  //declare the SPA structure
-    //int result;
-    //float min, sec;
-
-    //enter required input values into SPA structure
-
-    spa.year          = 2003;
-    spa.month         = 10;
-    spa.day           = 17;
-    spa.hour          = 12;
-    spa.minute        = 30;
-    spa.second        = 30;
-    spa.timezone      = -7.0;
-    spa.delta_ut1     = 0;
-    spa.delta_t       = 67;
-    spa.longitude     = -105.1786;
-    spa.latitude      = 39.742476;
-    spa.elevation     = 1830.14;
-    spa.pressure      = 820;
-    spa.temperature   = 11;
-    spa.slope         = 30;
-    spa.azm_rotation  = -10;
-    spa.atmos_refract = 0.5667;
-    spa.function      = SPA_ALL;
-
     //call the SPA calculate function and pass the SPA structure
 
-    spa_calculate(&spa);
+//   my_suntimes(float lat, float lon, PblTm time, float timezone, double angle);
+	PblTm t;
+    get_time(&t);
+	my_suntimes(0.0, 0.0, t, -5, 90.833);
 
 }
 
