@@ -9,7 +9,7 @@
 #define SHOW_RING true
 //LOW_RES_TIME means only updating when needed (better for battery assuming pebble is smart enough to only paint changed pixels)
 #define LOW_RES_TIME false
-#define INVERTED true
+#define INVERTED false
 #define EAST_TO_WEST_ORB_ROTATION true //as opposed to clockwise
 /*   ----- End Config Secion -----     */
 	
@@ -29,7 +29,7 @@ const GColor ForegroundColor = GColorWhite;
 const GColor BackgroundColor = GColorWhite;
 const GColor ForegroundColor = GColorBlack;
 #endif
-
+	
 	static const GPathInfo HOUR_HAND_POINTS = {
 	.num_points = 5,
 	.points = (GPoint []) {{-5, 14}, {-5, 0}, {0, -48}, {5, 0}, {5, 14}}
@@ -46,6 +46,7 @@ static const GPathInfo SECOND_HAND_POINTS = {
 
 Window window;
 Layer watch_face_layer;
+Layer sunlight_layer;
 Layer hour_layer;
 Layer minute_layer;
 Layer second_layer;
@@ -55,6 +56,7 @@ GPath hour_hand;
 GPath minute_hand;
 GPath second_hand;
 TextLayer date_layer;
+times suntimes;
 
 //Provides the ability to move something in a circle by degrees (0 = Top center)
 GPoint move_by_degrees(GPoint origin, int radius, int degrees) {
@@ -72,13 +74,18 @@ void draw_watch_face(Layer *layer, GContext *ctx) {
 	GRect layer_rect = layer_get_bounds(layer);
 	int layer_radius = 70;
 	
-	//Draw Watch Background
-	graphics_fill_circle(ctx, grect_center_point(&layer_rect), layer_radius);
+	//Do different things if we have a sunset than if we do not.
+	if (suntimes.sun_declin_deg <= -990.0) {
+		//Draw Watch Background
+		graphics_fill_circle(ctx, grect_center_point(&layer_rect), layer_radius);
 #if SHOW_RING
-	if (layer_radius > 2) {
-		graphics_draw_circle(ctx, grect_center_point(&layer_rect), (layer_radius - 2));
-	}
+		if (layer_radius > 2) {
+			graphics_draw_circle(ctx, grect_center_point(&layer_rect), (layer_radius - 2));
+		}
 #endif
+	}
+	else {
+	}
 }
 
 void draw_date() {
@@ -270,15 +277,17 @@ void handle_tick(AppContextRef ctx, PebbleTickEvent *tickE) {
 void handle_init(AppContextRef ctx) {
 	(void)ctx;
 
+	suntimes.sun_declin_deg = -1000.0;
+	
 	window_init(&window, "Astronomical Analog");
 	window_stack_push(&window, true /* Animated */);
 	
 #if !INVERTED
-	window_set_background_color(&window, BackgroundColor);
+        window_set_background_color(&window, BackgroundColor);
 #else
-	window_set_background_color(&window, ForegroundColor);
+        window_set_background_color(&window, ForegroundColor);
 #endif
-
+	
 	/* Main Watch Face */
 	layer_init(&watch_face_layer, GRect(0, 14, 144, 144));
 	watch_face_layer.update_proc = draw_watch_face;
@@ -329,14 +338,12 @@ void handle_init(AppContextRef ctx) {
 	layer_init(&hand_pin_layer, watch_face_layer.frame);
 	hand_pin_layer.update_proc = draw_hand_pin;
 	layer_add_child(&watch_face_layer, &hand_pin_layer);
-	
-    //call the SPA calculate function and pass the SPA structure
 
 //   my_suntimes(float lat, float lon, PblTm time, float timezone, double angle);
-	PblTm t;
-    get_time(&t);
-	my_suntimes(0.0, 0.0, t, -5, 90.833);
-
+//	PblTm t;
+//    get_time(&t);
+//	suntimes = my_suntimes(0.0, 0.0, t, -5, 90.833);
+	
 }
 
 void pbl_main(void *params) {
