@@ -2,9 +2,11 @@
 #include "pebble_app.h"
 #include "pebble_fonts.h"
 #include "suncalc.h"
+#include "http.h"
 
 /*   ------- Config Secion -------     */
-#define SHOW_SECONDS false
+#define ANDROID true
+#define SHOW_SECONDS true
 #define SHOW_DATE true
 #define SHOW_RING true
 //LOW_RES_TIME means only updating when needed (better for battery assuming pebble is smart enough to only paint changed pixels)
@@ -14,9 +16,14 @@
 /*   ----- End Config Secion -----     */
 	
 	
-#define MY_UUID { 0xE3, 0x2A, 0x8B, 0xDA, 0xE8, 0x2D, 0x45, 0x17, 0xA6, 0x9D, 0xA9, 0x29, 0x63, 0xFA, 0x84, 0x20 }
+#define MY_UUID { 0x91, 0x41, 0xB6, 0x28, 0xBC, 0x89, 0x49, 0x8E, 0xB1, 0x47, 0xA9, 0x29, 0x63, 0xFA, 0x84, 0x20 }
 
-PBL_APP_INFO(MY_UUID,
+PBL_APP_INFO(
+#if ANDROID
+			 MY_UUID,
+# else
+			 HTTP_UUID,
+#endif
              "Astronomical Analog", "Antgiant's Watches",
              1, 0, /* App version */
              DEFAULT_MENU_ICON,
@@ -38,15 +45,22 @@ static const GPathInfo MINUTE_HAND_POINTS = {
 	.num_points = 5,
 	.points = (GPoint []) {{-5, 14}, {-5, 0}, {0, -65}, {5, 0}, {5, 14}}
 };
-static const GPathInfo SECOND_HAND_POINTS = {
+static const GPathInfo SECOND_HAND_POINTS_BACKGROUND = {
 	.num_points = 2,
-	.points = (GPoint []) {{-1, 14}, {-1, -65}}
+	.points = (GPoint []) {{-2, 14}, {-2, -65}}
+};
+static const GPathInfo SECOND_HAND_POINTS_FOREGROUND = {
+	.num_points = 2,
+	.points = (GPoint []) {{2, 14}, {2, -65}}
+};
+GPathInfo night_pattern_points = {
+	.num_points = 7,
+	.points = (GPoint []) {{0, 0}, {1, 0}, {2, 2}, {3, 0}, {4, 0}, {4, 4}, {0, 4}}
 };
 
 
 Window window;
 Layer watch_face_layer;
-Layer sunlight_layer;
 Layer hour_layer;
 Layer minute_layer;
 Layer second_layer;
@@ -54,16 +68,138 @@ Layer hand_pin_layer;
 Layer orbiting_body_layer;
 GPath hour_hand;
 GPath minute_hand;
-GPath second_hand;
+GPath second_hand_foreground;
+GPath second_hand_background;
+GPath night_pattern;
 TextLayer date_layer;
+TextLayer date_layer_shadow;
+TextLayer sunup_layer;
+TextLayer sundown_layer;
 times suntimes;
+float latitude, longitude, timezone;
+double sun_angle = 90.833; //This is the official angle of the sun for sunrise/sunset
+bool have_gps_fix = false;
 
-//Provides the ability to move something in a circle by degrees (0 = Top center)
+//Provides the ability to move something in a circle clockwise by degrees (0 = Top center)
 GPoint move_by_degrees(GPoint origin, int radius, int degrees) {
 	GPoint newOrigin = origin;
 	newOrigin.y = (-cos_lookup(TRIG_MAX_ANGLE * degrees / 360) * radius / TRIG_MAX_RATIO) + origin.y;
 	newOrigin.x = (sin_lookup(TRIG_MAX_ANGLE * degrees / 360) * radius / TRIG_MAX_RATIO) + origin.x;
 	return newOrigin;
+}
+
+//Provides the ability to return a point moving around a rectangle clockwise by degrees (0 = Top center)
+GPoint move_by_degrees_rectangle(GRect rect, int degrees) {
+	GPoint point;
+	degrees = degrees%360;
+	if (degrees < 0) {
+		degrees = 360 + degrees;
+	}
+	if (degrees <= 45 || degrees >= 315 || (degrees >= 135 && degrees <= 225)) {
+		if (degrees >= 135 && degrees <= 225) {
+			point.y = rect.size.h;
+			point.x = rect.size.w - ((rect.size.h*((sin_lookup(TRIG_MAX_ANGLE * degrees / 360)*1.0)/(cos_lookup(TRIG_MAX_ANGLE * degrees / 360)*1.0)))/2 + rect.size.w/2);
+		}
+		else {
+			point.y = 0;
+			point.x = (rect.size.h*((sin_lookup(TRIG_MAX_ANGLE * degrees / 360)*1.0)/(cos_lookup(TRIG_MAX_ANGLE * degrees / 360)*1.0)))/2 + rect.size.w/2;
+		}
+	}
+	else { 
+		if (degrees > 225 && degrees < 315) {
+			point.x = 0;
+			point.y = (rect.size.w/(2.0*(sin_lookup(TRIG_MAX_ANGLE * degrees / 360)*1.0)/(cos_lookup(TRIG_MAX_ANGLE * degrees / 360)*1.0))) + rect.size.h/2;
+		}
+		else {
+			point.x = rect.size.w;
+			point.y = rect.size.h - ((rect.size.w/(2.0*(sin_lookup(TRIG_MAX_ANGLE * degrees / 360)*1.0)/(cos_lookup(TRIG_MAX_ANGLE * degrees / 360)*1.0))) + rect.size.h/2);
+		}
+	}
+	point.x = point.x - (rect.size.w/2);
+	point.y = point.y - (rect.size.h/2);
+	return point;
+}
+
+//Called if Httpebble is installed on phone.
+void have_time(int32_t dst_offset, bool is_dst, uint32_t unixtime, const char* tz_name, void* context) {
+  if (!is_dst) {
+    timezone = dst_offset/3600.0;
+  }
+  else {
+    timezone = (dst_offset/3600.0) - 1;
+  }
+ 
+  //Now that we have timezone get location
+  http_location_request();	
+}
+
+//Called if Httpebble is installed on phone.
+void have_location(float lat, float lon, float altitude, float accuracy, void* context) {
+	latitude = lat;
+	longitude = lon;  
+  	have_gps_fix = true;
+  //Mark sunrise/set layer in need of updating.
+  layer_mark_dirty(&watch_face_layer);
+}
+
+void draw_night_path(GRect rect, GContext *ctx) {
+		//Calculate sunrise/sunset
+		PblTm time;
+		get_time(&time);
+        suntimes = my_suntimes(latitude, longitude, time, timezone, sun_angle);
+
+		int angle_sunup, angle_sundown;
+
+        //Offset by 12 hours so top half is day and bottom half is night.
+		//Then get angle (15 degrees per hour + 1 degree per 4 minutes)
+		angle_sunup = (15*((suntimes.sunup.tm_hour + 12)%24)) + (suntimes.sunup.tm_min/4);
+		angle_sundown = (15*((suntimes.sundown.tm_hour + 12)%24)) + (suntimes.sundown.tm_min/4);
+
+#if EAST_TO_WEST_ORB_ROTATION
+        angle_sunup = -(angle_sunup - 360);
+        angle_sundown = -(angle_sundown - 360);
+#endif	
+//		move_by_degrees(center_point, layer_radius - body_radius - 10, angle)
+//		move_by_degrees_rectangle(GRect rect, int degrees)
+	
+		night_pattern_points.points[0] = move_by_degrees_rectangle(rect, angle_sunup);
+		night_pattern_points.points[1].x = (int16_t)(0);
+		night_pattern_points.points[1].y = (int16_t)(0);
+		night_pattern_points.points[2] = move_by_degrees_rectangle(rect, angle_sundown);
+	
+		night_pattern_points.points[3].x = (int16_t)(-rect.size.w/2);
+		night_pattern_points.points[3].y = (int16_t)(rect.size.h/2);
+		night_pattern_points.points[4].x = (int16_t)(-rect.size.w/2);
+		night_pattern_points.points[4].y = (int16_t)(rect.size.h/2);
+		night_pattern_points.points[5].x = (int16_t)(rect.size.w/2);
+		night_pattern_points.points[5].y = (int16_t)(rect.size.h/2);
+		night_pattern_points.points[6].x = (int16_t)(rect.size.w/2);
+		night_pattern_points.points[6].y = (int16_t)(rect.size.h/2);
+
+		gpath_init(&night_pattern, &night_pattern_points);
+		gpath_move_to(&night_pattern, grect_center_point(&rect));
+		graphics_context_set_fill_color(ctx, BackgroundColor);
+		gpath_draw_filled(ctx, &night_pattern);
+
+  		static char sunup_text[] = "00:00";
+  		static char sundown_text[] = "00:00";
+	    char *time_format;
+
+	    if (clock_is_24h_style()) 
+		{
+			time_format = "%R";
+		}
+		else 
+		{
+			time_format = "%l:%M";
+		}
+
+		string_format_time(sunup_text, sizeof(sunup_text), time_format, &suntimes.sunup);	
+		string_format_time(sundown_text, sizeof(sundown_text), time_format, &suntimes.sundown);	
+  
+		text_layer_set_text(&sunup_layer, sunup_text);
+		text_layer_set_text(&sundown_layer, sundown_text);
+
 }
 
 void draw_watch_face(Layer *layer, GContext *ctx) {
@@ -74,18 +210,23 @@ void draw_watch_face(Layer *layer, GContext *ctx) {
 	GRect layer_rect = layer_get_bounds(layer);
 	int layer_radius = 70;
 	
-	//Do different things if we have a sunset than if we do not.
-	if (suntimes.sun_declin_deg <= -990.0) {
-		//Draw Watch Background
-		graphics_fill_circle(ctx, grect_center_point(&layer_rect), layer_radius);
+	//Draw Watch Background
+	graphics_fill_circle(ctx, grect_center_point(&layer_rect), layer_radius);
+
+	//Only draw Sunlight layer if GPS fix exists
+	if (have_gps_fix) {
+		draw_night_path(layer_rect, ctx);
+		graphics_context_set_stroke_color(ctx, ForegroundColor);
+		graphics_draw_circle(ctx, grect_center_point(&layer_rect), (layer_radius - 1));
+		graphics_draw_circle(ctx, grect_center_point(&layer_rect), (layer_radius));
+		graphics_context_set_stroke_color(ctx, BackgroundColor);
+	}
+
 #if SHOW_RING
-		if (layer_radius > 2) {
-			graphics_draw_circle(ctx, grect_center_point(&layer_rect), (layer_radius - 2));
-		}
+	if (layer_radius > 2) {
+		graphics_draw_circle(ctx, grect_center_point(&layer_rect), (layer_radius - 2));
+	}
 #endif
-	}
-	else {
-	}
 }
 
 void draw_date() {
@@ -96,6 +237,7 @@ void draw_date() {
 	string_format_time(dom_text, sizeof(dom_text), "%e", &t);	
   
 	text_layer_set_text(&date_layer, dom_text);
+	text_layer_set_text(&date_layer_shadow, dom_text);
 }
 
 void draw_orbiting_body(Layer *layer, GContext *ctx) {
@@ -134,6 +276,7 @@ void draw_orbiting_body(Layer *layer, GContext *ctx) {
 #endif	
 	graphics_fill_circle(ctx, move_by_degrees(center_point, layer_radius - body_radius - 10, angle), body_radius);
 	graphics_draw_circle(ctx, move_by_degrees(center_point, layer_radius - body_radius - 10, angle), body_radius);
+
 }
 
 void draw_hand_pin(Layer *layer, GContext *ctx) {
@@ -204,17 +347,26 @@ void draw_second_hand(Layer *layer, GContext *ctx) {
     PblTm t;
 	int second;
 
-	graphics_context_set_fill_color(ctx, BackgroundColor);
-	graphics_context_set_stroke_color(ctx, BackgroundColor);
+	graphics_context_set_fill_color(ctx, ForegroundColor);
+	graphics_context_set_stroke_color(ctx, ForegroundColor);
 
     get_time(&t);
 	second = t.tm_sec;
 	
 	//Rotate second hand to to proper spot (6 degrees per second)
-	gpath_rotate_to(&second_hand, (TRIG_MAX_ANGLE / 360) * 6 * second);
+	gpath_rotate_to(&second_hand_foreground, (TRIG_MAX_ANGLE / 360) * 6 * second);
 	
-	gpath_draw_filled(ctx, &second_hand);
-	gpath_draw_outline(ctx, &second_hand);
+	gpath_draw_filled(ctx, &second_hand_foreground);
+	gpath_draw_outline(ctx, &second_hand_foreground);
+
+	graphics_context_set_fill_color(ctx, BackgroundColor);
+	graphics_context_set_stroke_color(ctx, BackgroundColor);
+
+	//Rotate second hand to to proper spot (6 degrees per second)
+	gpath_rotate_to(&second_hand_background, (TRIG_MAX_ANGLE / 360) * 6 * second);
+	
+	gpath_draw_filled(ctx, &second_hand_background);
+	gpath_draw_outline(ctx, &second_hand_background);
 }
 
 /* handle_tick is called at every time change. It updates 
@@ -229,13 +381,15 @@ void handle_tick(AppContextRef ctx, PebbleTickEvent *tickE) {
 	}
 #endif
 	
+  	if (tickE->units_changed == 0 || tickE->units_changed & HOUR_UNIT) {
+		http_time_request(); //Update Sunrise/set location & data
+
 //No need to seperatly update hour hand if done by another hand
 #if LOW_RES_TIME
-  	if (tickE->units_changed == 0 || tickE->units_changed & HOUR_UNIT) {
         layer_mark_dirty(&hour_layer);
 		layer_mark_dirty(&orbiting_body_layer);
-	}
 #endif
+	}
 #if LOW_RES_TIME || !SHOW_SECONDS
 	if (tickE->units_changed == 0 || tickE->units_changed & MINUTE_UNIT) {
         layer_mark_dirty(&minute_layer);
@@ -277,21 +431,37 @@ void handle_tick(AppContextRef ctx, PebbleTickEvent *tickE) {
 void handle_init(AppContextRef ctx) {
 	(void)ctx;
 
-	suntimes.sun_declin_deg = -1000.0;
-	
 	window_init(&window, "Astronomical Analog");
 	window_stack_push(&window, true /* Animated */);
-	
-#if !INVERTED
-        window_set_background_color(&window, BackgroundColor);
-#else
-        window_set_background_color(&window, ForegroundColor);
-#endif
+    window_set_background_color(&window, BackgroundColor);
 	
 	/* Main Watch Face */
 	layer_init(&watch_face_layer, GRect(0, 14, 144, 144));
 	watch_face_layer.update_proc = draw_watch_face;
 	layer_add_child(&window.layer, &watch_face_layer);
+#if EAST_TO_WEST_ORB_ROTATION
+	text_layer_init(&sunup_layer, GRect((int)(144 - 44), (int)(144), 40, 30));
+	text_layer_set_text_alignment(&sunup_layer, GTextAlignmentRight);
+#else
+	text_layer_init(&sunup_layer, GRect((int)(4), (int)(144), 40, 30));
+	text_layer_set_text_alignment(&sunup_layer, GTextAlignmentLeft);
+#endif
+	text_layer_set_font(&sunup_layer, fonts_get_system_font(FONT_KEY_GOTHIC_18));
+	text_layer_set_text_color(&sunup_layer, ForegroundColor);
+	text_layer_set_background_color(&sunup_layer, GColorClear);
+	layer_add_child(&window.layer, &sunup_layer.layer);	
+#if EAST_TO_WEST_ORB_ROTATION
+	text_layer_init(&sundown_layer, GRect((int)(4), (int)(144), 40, 30));
+	text_layer_set_text_alignment(&sundown_layer, GTextAlignmentLeft);
+#else
+	text_layer_init(&sundown_layer, GRect((int)(144 - 44), (int)(144), 40, 30));
+	text_layer_set_text_alignment(&sundown_layer, GTextAlignmentRight);
+#endif
+	text_layer_set_font(&sundown_layer, fonts_get_system_font(FONT_KEY_GOTHIC_18));
+	text_layer_set_text_color(&sundown_layer, ForegroundColor);
+	text_layer_set_background_color(&sundown_layer, GColorClear);
+	layer_add_child(&window.layer, &sundown_layer.layer);	
+
 
 #if SHOW_DATE
 	/* Date */
@@ -301,6 +471,12 @@ void handle_init(AppContextRef ctx) {
 	text_layer_set_text_color(&date_layer, BackgroundColor);
 	text_layer_set_background_color(&date_layer, GColorClear);
 	layer_add_child(&watch_face_layer, &date_layer.layer);	
+	text_layer_init(&date_layer_shadow, GRect((int)(144/2 - 17), (int)(144/2 + 18), 30, 30));
+	text_layer_set_font(&date_layer_shadow, fonts_get_system_font(FONT_KEY_GOTHIC_24_BOLD));
+	text_layer_set_text_alignment(&date_layer_shadow, GTextAlignmentCenter);
+	text_layer_set_text_color(&date_layer_shadow, ForegroundColor);
+	text_layer_set_background_color(&date_layer_shadow, GColorClear);
+	layer_add_child(&watch_face_layer, &date_layer_shadow.layer);	
 	draw_date();
 #endif
 	
@@ -316,8 +492,10 @@ void handle_init(AppContextRef ctx) {
 	layer_init(&second_layer, watch_face_layer.frame);
 	second_layer.update_proc = draw_second_hand;
 	layer_add_child(&watch_face_layer, &second_layer);
-	gpath_init(&second_hand, &SECOND_HAND_POINTS);
-	gpath_move_to(&second_hand, GPoint(72, 58));
+	gpath_init(&second_hand_foreground, &SECOND_HAND_POINTS_FOREGROUND);
+	gpath_move_to(&second_hand_foreground, GPoint(72, 58));
+	gpath_init(&second_hand_background, &SECOND_HAND_POINTS_BACKGROUND);
+	gpath_move_to(&second_hand_background, GPoint(72, 58));
 #endif
 
 	//Minute Hand
@@ -339,11 +517,14 @@ void handle_init(AppContextRef ctx) {
 	hand_pin_layer.update_proc = draw_hand_pin;
 	layer_add_child(&watch_face_layer, &hand_pin_layer);
 
-//   my_suntimes(float lat, float lon, PblTm time, float timezone, double angle);
-//	PblTm t;
-//    get_time(&t);
-//	suntimes = my_suntimes(0.0, 0.0, t, -5, 90.833);
-	
+	http_set_app_id(83439474);
+
+	http_register_callbacks((HTTPCallbacks){
+		.time=have_time,
+		.location=have_location
+	}, (void*)ctx);
+
+	http_time_request();
 }
 
 void pbl_main(void *params) {
@@ -360,6 +541,12 @@ void pbl_main(void *params) {
 #else
 			.tick_units = MINUTE_UNIT
 #endif
+		},
+		.messaging_info = {
+			.buffer_sizes = {
+				.inbound = 124,
+				.outbound = 124,
+			}
 		}
 	};
 	app_event_loop(params, &handlers);

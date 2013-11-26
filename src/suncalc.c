@@ -32,9 +32,6 @@ PblTm excel_to_pebble_time(double excel_time)
 	get_time(&time);	//Assume current date for time
 	excel_time = excel_time - (int)excel_time; //Remove date portion if there is one
 
-	if (!clock_is_24h_style() && excel_time > .5) {
-      excel_time = excel_time - .5;
-    }
 	seconds_time = excel_time*24*60*60;
 	time.tm_hour = seconds_time/(60*60);	//Hours since midnight.
 	time.tm_min = (seconds_time/60)%60;		//Minutes after the hour.
