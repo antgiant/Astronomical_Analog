@@ -119,6 +119,26 @@ GPoint move_by_degrees_rectangle(GRect rect, int degrees) {
 	point.y = point.y - (rect.size.h/2);
 	return point;
 }
+//Given a rectangle and a point on the rectangle return the "next" corner (Point must have coordinates relative to rect center.)
+int next_rectangle_corner(GRect rect, GPoint point) {
+	//Default to "first" corner
+	int corner = 0;
+	if (point.x == -rect.size.w/2) {
+		corner = 3;
+	}
+	else if (point.x == rect.size.w/2) {
+		corner = 1;
+	}
+	else if (point.y == rect.size.h/2) {
+		corner = 2;
+	}
+#if EAST_TO_WEST_ORB_ROTATION
+	if (corner == 1 || corner == 3) {
+		corner = (corner + 2)%4;
+	}
+#endif
+	return corner;
+}
 
 //Called if Httpebble is installed on phone.
 void have_time(int32_t dst_offset, bool is_dst, uint32_t unixtime, const char* tz_name, void* context) {
@@ -143,38 +163,75 @@ void have_location(float lat, float lon, float altitude, float accuracy, void* c
 }
 
 void draw_night_path(GRect rect, GContext *ctx) {
+			GPathInfo corner_points = {
+			.num_points = 4,
+#if EAST_TO_WEST_ORB_ROTATION
+			.points = (GPoint []) {{-rect.size.w/2, -rect.size.h/2}, {-rect.size.w/2, rect.size.h/2}, {rect.size.w/2, rect.size.h/2}, {rect.size.w/2, -rect.size.h/2}}
+#else
+			.points = (GPoint []) {{rect.size.w/2, -rect.size.h/2}, {rect.size.w/2, rect.size.h/2}, {-rect.size.w/2, rect.size.h/2}, {-rect.size.w/2, -rect.size.h/2}}
+#endif
+		};
 		//Calculate sunrise/sunset
 		PblTm time;
 		get_time(&time);
         suntimes = my_suntimes(latitude, longitude, time, timezone, sun_angle);
 
-		int angle_sunup, angle_sundown;
+		int angle_sunup, angle_sundown, angle_diff;
 
         //Offset by 12 hours so top half is day and bottom half is night.
 		//Then get angle (15 degrees per hour + 1 degree per 4 minutes)
 		angle_sunup = (15*((suntimes.sunup.tm_hour + 12)%24)) + (suntimes.sunup.tm_min/4);
 		angle_sundown = (15*((suntimes.sundown.tm_hour + 12)%24)) + (suntimes.sundown.tm_min/4);
-
+	
 #if EAST_TO_WEST_ORB_ROTATION
-        angle_sunup = -(angle_sunup - 360);
-        angle_sundown = -(angle_sundown - 360);
+		int temp = angle_sunup;
+        angle_sunup = (360 - angle_sunup);
+        angle_sundown = (360 - angle_sundown);
+		angle_diff = angle_sundown - angle_sunup;
+#else
+		angle_diff = angle_sunup - angle_sundown;
 #endif	
-//		move_by_degrees(center_point, layer_radius - body_radius - 10, angle)
-//		move_by_degrees_rectangle(GRect rect, int degrees)
+	
+		if (angle_diff < 0) { angle_diff += 360; }
+		if (angle_diff > 360) { angle_diff = angle_diff%360; }
 	
 		night_pattern_points.points[0] = move_by_degrees_rectangle(rect, angle_sunup);
 		night_pattern_points.points[1].x = (int16_t)(0);
 		night_pattern_points.points[1].y = (int16_t)(0);
 		night_pattern_points.points[2] = move_by_degrees_rectangle(rect, angle_sundown);
-	
-		night_pattern_points.points[3].x = (int16_t)(-rect.size.w/2);
-		night_pattern_points.points[3].y = (int16_t)(rect.size.h/2);
-		night_pattern_points.points[4].x = (int16_t)(-rect.size.w/2);
-		night_pattern_points.points[4].y = (int16_t)(rect.size.h/2);
-		night_pattern_points.points[5].x = (int16_t)(rect.size.w/2);
-		night_pattern_points.points[5].y = (int16_t)(rect.size.h/2);
-		night_pattern_points.points[6].x = (int16_t)(rect.size.w/2);
-		night_pattern_points.points[6].y = (int16_t)(rect.size.h/2);
+
+		//On the same line
+		if (angle_diff < 180 && (night_pattern_points.points[0].x == night_pattern_points.points[2].x || night_pattern_points.points[0].y == night_pattern_points.points[2].y)) {
+			//set remaining points to existing points
+			night_pattern_points.points[3] = move_by_degrees_rectangle(rect, angle_sundown);
+			night_pattern_points.points[4] = move_by_degrees_rectangle(rect, angle_sundown);
+			night_pattern_points.points[5] = move_by_degrees_rectangle(rect, angle_sunup);
+			night_pattern_points.points[6] = move_by_degrees_rectangle(rect, angle_sunup);
+		}
+		//2 Corners between sunup and sundown
+		else if (-night_pattern_points.points[0].x == night_pattern_points.points[2].x || -night_pattern_points.points[0].y == night_pattern_points.points[2].y) {
+			int corner = next_rectangle_corner(rect, move_by_degrees_rectangle(rect, angle_sundown));
+			night_pattern_points.points[3] = corner_points.points[corner];
+			night_pattern_points.points[4] = corner_points.points[corner];
+			night_pattern_points.points[5] = corner_points.points[(corner + 1)%4];
+			night_pattern_points.points[6] = corner_points.points[(corner + 1)%4];
+		}
+		//1 Corner between sunup and sundown
+		else if (angle_diff < 180) {
+			int corner = next_rectangle_corner(rect, night_pattern_points.points[2]);
+			night_pattern_points.points[3] = corner_points.points[corner];
+			night_pattern_points.points[4] = corner_points.points[corner];
+			night_pattern_points.points[5] = corner_points.points[corner];
+			night_pattern_points.points[6] = corner_points.points[corner];
+		}
+		//3 Corners between sunup and sundown
+		else {
+			int corner = next_rectangle_corner(rect, night_pattern_points.points[2]);
+			night_pattern_points.points[3] = corner_points.points[corner];
+			night_pattern_points.points[4] = corner_points.points[(corner + 1)%4];
+			night_pattern_points.points[5] = corner_points.points[(corner + 2)%4];
+			night_pattern_points.points[6] = corner_points.points[(corner + 3)%4];
+		}
 
 		gpath_init(&night_pattern, &night_pattern_points);
 		gpath_move_to(&night_pattern, grect_center_point(&rect));
