@@ -1,0 +1,25 @@
+{
+    "versionLabel": "2.0",
+    "uuid": "6214441d-2d92-4a91-be88-d0cdba40e603",
+    "appKeys": {},
+    "longName": "Astronomical Analog",
+    "versionCode": 1,
+    "capabilities": [
+        "location",
+        "configurable"
+    ],
+    "shortName": "Astronomical Analog",
+    "companyName": "antgiant",
+    "watchapp": {
+        "watchface": true
+    },
+    "resources": {
+        "media": [
+            {
+                "type": "raw",
+                "name": "DUMMY",
+                "file": "data/resource_map.json"
+            }
+        ]
+    }
+}
