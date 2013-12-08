@@ -3,7 +3,6 @@
 #include "pebble_fonts.h"
 #include "suncalc.h"
 #include "http.h"
-//#include "mini-printf.h"
 
 /*   ------- Config Secion -------     */
 #define ANDROID true
@@ -80,7 +79,6 @@ TextLayer date_layer_shadow;
 #endif
 TextLayer sunup_layer;
 TextLayer sundown_layer;
-TextLayer debug1_layer, debug2_layer, debug3_layer, debug4_layer;
 times suntimes;
 float latitude, longitude, timezone;
 double sun_angle = 90.833; //This is the official angle of the sun for sunrise/sunset
@@ -158,33 +156,6 @@ void have_time(int32_t dst_offset, bool is_dst, uint32_t unixtime, const char* t
  
   //Now that we have timezone get location
   http_location_request();	
-}
-
-void ftoa(char* str, double val, int precision) {
-  //  start with positive/negative
-  if (val < 0) {
-    *(str++) = '-';
-    val = -val;
-  }
-  //  integer value
-  snprintf(str, 12, "%d", (int) val);
-  str += strlen(str);
-  val -= (int) val;
-  //  decimals
-  if ((precision > 0) && (val >= .00001)) {
-    //  add period
-    *(str++) = '.';
-    //  loop through precision
-    for (int i = 0;  i < precision;  i++)
-      if (val > 0) {
-        val *= 10;
-        *(str++) = '0' + (int) (val + ((i == precision - 1) ? .5 : 0));
-        val -= (int) val;
-      } else
-        break;
-  }
-  //  terminate
-  *str = '\0';
 }
 
 //Called if Httpebble is installed on phone.
