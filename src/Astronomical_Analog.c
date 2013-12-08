@@ -3,6 +3,7 @@
 #include "pebble_fonts.h"
 #include "suncalc.h"
 #include "http.h"
+//#include "mini-printf.h"
 
 /*   ------- Config Secion -------     */
 #define ANDROID true
@@ -68,13 +69,18 @@ Layer hand_pin_layer;
 Layer orbiting_body_layer;
 GPath hour_hand;
 GPath minute_hand;
+#if SHOW_SECONDS
 GPath second_hand_foreground;
 GPath second_hand_background;
+#endif
 GPath night_pattern;
+#if SHOW_DATE
 TextLayer date_layer;
 TextLayer date_layer_shadow;
+#endif
 TextLayer sunup_layer;
 TextLayer sundown_layer;
+TextLayer debug1_layer, debug2_layer, debug3_layer, debug4_layer;
 times suntimes;
 float latitude, longitude, timezone;
 double sun_angle = 90.833; //This is the official angle of the sun for sunrise/sunset
@@ -119,6 +125,7 @@ GPoint move_by_degrees_rectangle(GRect rect, int degrees) {
 	point.y = point.y - (rect.size.h/2);
 	return point;
 }
+
 //Given a rectangle and a point on the rectangle return the "next" corner (Point must have coordinates relative to rect center.)
 int next_rectangle_corner(GRect rect, GPoint point) {
 	//Default to "first" corner
@@ -153,6 +160,33 @@ void have_time(int32_t dst_offset, bool is_dst, uint32_t unixtime, const char* t
   http_location_request();	
 }
 
+void ftoa(char* str, double val, int precision) {
+  //  start with positive/negative
+  if (val < 0) {
+    *(str++) = '-';
+    val = -val;
+  }
+  //  integer value
+  snprintf(str, 12, "%d", (int) val);
+  str += strlen(str);
+  val -= (int) val;
+  //  decimals
+  if ((precision > 0) && (val >= .00001)) {
+    //  add period
+    *(str++) = '.';
+    //  loop through precision
+    for (int i = 0;  i < precision;  i++)
+      if (val > 0) {
+        val *= 10;
+        *(str++) = '0' + (int) (val + ((i == precision - 1) ? .5 : 0));
+        val -= (int) val;
+      } else
+        break;
+  }
+  //  terminate
+  *str = '\0';
+}
+
 //Called if Httpebble is installed on phone.
 void have_location(float lat, float lon, float altitude, float accuracy, void* context) {
 	latitude = lat;
@@ -163,7 +197,8 @@ void have_location(float lat, float lon, float altitude, float accuracy, void* c
 }
 
 void draw_night_path(GRect rect, GContext *ctx) {
-			GPathInfo corner_points = {
+
+		GPathInfo corner_points = {
 			.num_points = 4,
 #if EAST_TO_WEST_ORB_ROTATION
 			.points = (GPoint []) {{-rect.size.w/2, -rect.size.h/2}, {-rect.size.w/2, rect.size.h/2}, {rect.size.w/2, rect.size.h/2}, {rect.size.w/2, -rect.size.h/2}}
@@ -171,6 +206,7 @@ void draw_night_path(GRect rect, GContext *ctx) {
 			.points = (GPoint []) {{rect.size.w/2, -rect.size.h/2}, {rect.size.w/2, rect.size.h/2}, {-rect.size.w/2, rect.size.h/2}, {-rect.size.w/2, -rect.size.h/2}}
 #endif
 		};
+
 		//Calculate sunrise/sunset
 		PblTm time;
 		get_time(&time);
@@ -184,7 +220,6 @@ void draw_night_path(GRect rect, GContext *ctx) {
 		angle_sundown = (15*((suntimes.sundown.tm_hour + 12)%24)) + (suntimes.sundown.tm_min/4);
 	
 #if EAST_TO_WEST_ORB_ROTATION
-		int temp = angle_sunup;
         angle_sunup = (360 - angle_sunup);
         angle_sundown = (360 - angle_sundown);
 		angle_diff = angle_sundown - angle_sunup;
@@ -250,13 +285,12 @@ void draw_night_path(GRect rect, GContext *ctx) {
 		{
 			time_format = "%l:%M";
 		}
-
+	
 		string_format_time(sunup_text, sizeof(sunup_text), time_format, &suntimes.sunup);	
 		string_format_time(sundown_text, sizeof(sundown_text), time_format, &suntimes.sundown);	
   
 		text_layer_set_text(&sunup_layer, sunup_text);
 		text_layer_set_text(&sundown_layer, sundown_text);
-
 }
 
 void draw_watch_face(Layer *layer, GContext *ctx) {
@@ -285,7 +319,7 @@ void draw_watch_face(Layer *layer, GContext *ctx) {
 	}
 #endif
 }
-
+#if SHOW_DATE
 void draw_date() {
     PblTm t;
     get_time(&t);
@@ -296,7 +330,7 @@ void draw_date() {
 	text_layer_set_text(&date_layer, dom_text);
 	text_layer_set_text(&date_layer_shadow, dom_text);
 }
-
+#endif
 void draw_orbiting_body(Layer *layer, GContext *ctx) {
     PblTm t;
 	int hour, angle;
@@ -399,7 +433,7 @@ void draw_minute_hand(Layer *layer, GContext *ctx) {
 	gpath_draw_filled(ctx, &minute_hand);
 	gpath_draw_outline(ctx, &minute_hand);
 }
-
+#if SHOW_SECONDS
 void draw_second_hand(Layer *layer, GContext *ctx) {
     PblTm t;
 	int second;
@@ -425,7 +459,7 @@ void draw_second_hand(Layer *layer, GContext *ctx) {
 	gpath_draw_filled(ctx, &second_hand_background);
 	gpath_draw_outline(ctx, &second_hand_background);
 }
-
+#endif
 /* handle_tick is called at every time change. It updates 
    things appropriately*/
 void handle_tick(AppContextRef ctx, PebbleTickEvent *tickE) {

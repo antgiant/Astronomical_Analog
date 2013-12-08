@@ -51,23 +51,16 @@ times my_suntimes(float lat, float lon, PblTm time, float timezone, double angle
     double julian_day, julian_century, geom_mean_long_sun_deg, geom_mean_anom_sun_deg, eccent_earth_orbit;
 	double sun_eq_of_ctr, sun_true_long_deg, sun_app_long_deg, mean_obliq_ecliptic_deg, obliq_corr_deg;
 	double y, eq_of_time_minutes, ha_sunrise_deg, solar_noon_LST, sunrise_time_LST, sunset_time_LST;
+
+	//Julian date formula from http://en.wikipedia.org/wiki/Julian_day
 	int year = time.tm_year + 1900;
-
-    if (time.tm_mon < 3) {
-        time.tm_mon += 12;
-        year--;
-    }
-
-    julian_day = (int)(365.25*(year+4716.0));
-	julian_day += (int)(30.6001*(time.tm_mon+1));
-	
-	//Day in decimal format
-	julian_day += (time.tm_mday + (time.tm_hour - timezone + (time.tm_min + (time.tm_sec)/60.0)/60.0)/24.0) - 1524.5;
-
-    if (julian_day > 2299160.0) {
-        julian_day += 2 - (int)(year/100);
-		julian_day += (int)((int)(year/100)/4);
-    }
+	int a = (14 - time.tm_mon)/12; //1 for Jan and Feb, 0 for all other months
+        year = year + 4800 - a;
+	int month = (time.tm_mon + 1) + (12*a) - 3; //0 for Mar, 11 for Feb
+	//Day portion
+	julian_day = time.tm_mday + (((153*month) + 2)/5) + (365*year) + (year/4) - (year/100) + (year/400) - 32045;
+	//Time portion
+	julian_day += ((time.tm_hour - timezone -12)/24.0) + (time.tm_min/1440.0) + (time.tm_sec/86400.0);
 
 	julian_century = (julian_day-2451545.0)/36525.0;
 
@@ -85,7 +78,7 @@ times my_suntimes(float lat, float lon, PblTm time, float timezone, double angle
 	obliq_corr_deg = mean_obliq_ecliptic_deg + 0.00256*cos(radians(125.04 - 1934.136*julian_century));
 	return_times.sun_declin_deg = degrees(my_asin(sin(radians(obliq_corr_deg))*sin(radians(sun_app_long_deg))));
 	y = tan(radians(obliq_corr_deg/2))*tan(radians(obliq_corr_deg/2));
-	eq_of_time_minutes = 4*degrees(y*sin(2*radians(geom_mean_long_sun_deg)) - 2*eccent_earth_orbit*sin(radians(sun_eq_of_ctr)) + 4*eccent_earth_orbit*y*sin(radians(sun_eq_of_ctr))*cos(2*radians(geom_mean_long_sun_deg)) - 0.5*y*y*sin(4*radians(geom_mean_long_sun_deg)) - 1.25*eccent_earth_orbit*eccent_earth_orbit*sin(2*radians(sun_eq_of_ctr)));
+	eq_of_time_minutes = 4*degrees(y*sin(2*radians(geom_mean_long_sun_deg)) - 2*eccent_earth_orbit*sin(radians(geom_mean_anom_sun_deg)) + 4*eccent_earth_orbit*y*sin(radians(geom_mean_anom_sun_deg))*cos(2*radians(geom_mean_long_sun_deg)) - 0.5*y*y*sin(4*radians(geom_mean_long_sun_deg)) - 1.25*eccent_earth_orbit*eccent_earth_orbit*sin(2*radians(geom_mean_anom_sun_deg)));
 	ha_sunrise_deg = ha_sunrise_deg_calc(angle, lat, return_times.sun_declin_deg);
 	solar_noon_LST = (720 - 4*lon - eq_of_time_minutes+timezone*60)/1440;
 	return_times.solar_noon = excel_to_pebble_time(solar_noon_LST);
