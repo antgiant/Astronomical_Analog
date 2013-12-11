@@ -1,8 +1,8 @@
 typedef struct {
-	PblTm solar_noon;
-	PblTm sunup;
-	PblTm sundown;
+	struct tm *solar_noon;
+	struct tm *sunup;
+	struct tm *sundown;
 	double sun_declin_deg;
 } times;
 
-times my_suntimes(float lat, float lon, PblTm time, float timezone, double angle);
+times my_suntimes(float lat, float lon, struct tm *time, float timezone, double angle);
