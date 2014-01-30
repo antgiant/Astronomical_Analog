@@ -279,14 +279,13 @@ void draw_date() {
 }
 #endif
 void draw_orbiting_body(Layer *layer, GContext *ctx) {
-    struct tm t;
 	int hour, angle;
 
 	graphics_context_set_fill_color(ctx, GColorWhite);
 	graphics_context_set_stroke_color(ctx, GColorBlack);
 
     //Offset by 12 hours so top half is day and bottom half is night.
-	hour = (t.tm_hour + 12)%24;
+	hour = (t->tm_hour + 12)%24;
 
 	//Get info about main circle for watch face
 	GRect layer_rect = layer_get_bounds(layer);
@@ -304,7 +303,7 @@ void draw_orbiting_body(Layer *layer, GContext *ctx) {
 	angle = (15*hour);
 #else
 	int minute;
-	minute = t.tm_min;
+	minute = t->tm_min;
 	//Rotate orbiting body to proper spot (15 degrees per hour + 1 degree per 4 minutes)
 	angle = (15*hour) + (minute/4);
 #endif
@@ -332,20 +331,19 @@ void draw_hand_pin(Layer *layer, GContext *ctx) {
 }
 
 void draw_hour_hand(Layer *layer, GContext *ctx) {
-    struct tm t;
 	int hour;
 
 	graphics_context_set_fill_color(ctx, BackgroundColor);
 	graphics_context_set_stroke_color(ctx, ForegroundColor);
 
-	hour = t.tm_hour%12;
+	hour = t->tm_hour%12;
 
 #if LOW_RES_TIME
 	//Rotate hour hand to to proper spot (30 degrees per hour)
 	gpath_rotate_to(hour_hand, (TRIG_MAX_ANGLE / 360) * (30*hour));
 #else
 	int minute;
-	minute = t.tm_min;
+	minute = t->tm_min;
 	//Rotate hour hand to to proper spot (30 degrees per hour + 1 degree per 2 minutes)
 	gpath_rotate_to(hour_hand, (TRIG_MAX_ANGLE / 360) * ((30*hour) + (minute/2)));
 #endif
@@ -355,13 +353,12 @@ void draw_hour_hand(Layer *layer, GContext *ctx) {
 }
 
 void draw_minute_hand(Layer *layer, GContext *ctx) {
-    struct tm t;
 	int minute;
 
 	graphics_context_set_fill_color(ctx, BackgroundColor);
 	graphics_context_set_stroke_color(ctx, ForegroundColor);
 
-	minute = t.tm_min;
+	minute = t->tm_min;
 	
 
 #if LOW_RES_TIME || !SHOW_SECONDS
@@ -369,7 +366,7 @@ void draw_minute_hand(Layer *layer, GContext *ctx) {
 	gpath_rotate_to(minute_hand, (TRIG_MAX_ANGLE / 360) * (6*minute));
 #else
 	int second;
-	second = t.tm_sec;
+	second = t->tm_sec;
 	//Rotate minute hand to to proper spot (6 degrees per minute + 1 degree per 10 seconds)
 	gpath_rotate_to(minute_hand, (TRIG_MAX_ANGLE / 360) * ((6*minute) + (second/10)));
 #endif
@@ -379,13 +376,12 @@ void draw_minute_hand(Layer *layer, GContext *ctx) {
 }
 #if SHOW_SECONDS
 void draw_second_hand(Layer *layer, GContext *ctx) {
-    struct tm t;
 	int second;
 
 	graphics_context_set_fill_color(ctx, ForegroundColor);
 	graphics_context_set_stroke_color(ctx, ForegroundColor);
 
-	second = t.tm_sec;
+	second = t->tm_sec;
 	
 	//Rotate second hand to to proper spot (6 degrees per second)
 	gpath_rotate_to(second_hand_foreground, (TRIG_MAX_ANGLE / 360) * 6 * second);
@@ -430,7 +426,7 @@ void handle_tick(struct tm *tick_time, TimeUnits units_changed) {
 #if LOW_RES_TIME || !SHOW_SECONDS
 	if (units_changed == 0 || units_changed & MINUTE_UNIT) {
         layer_mark_dirty(minute_layer);
-  #if !LOW_RES_TIME
+#if !LOW_RES_TIME
 		//Only move hour hand every two minutes (due to 2 minutes per degree rotation).
 		if (units_changed == 0 || tick_time->tm_min%2 == 0) {
         	layer_mark_dirty(hour_layer);
@@ -445,7 +441,7 @@ void handle_tick(struct tm *tick_time, TimeUnits units_changed) {
 #if SHOW_SECONDS
   	if (units_changed == 0 || units_changed & SECOND_UNIT) {
         layer_mark_dirty(second_layer);
-  #if !LOW_RES_TIME
+#if !LOW_RES_TIME
 		//Only move minute hand every two seconds (due to 10 seconds per degree rotation).
 		if (units_changed == 0 || tick_time->tm_sec%10 == 0) {
         	layer_mark_dirty(minute_layer);
@@ -458,7 +454,7 @@ void handle_tick(struct tm *tick_time, TimeUnits units_changed) {
 				layer_mark_dirty(orbiting_body_layer);
 			}
 		}
-  #endif
+#endif
 	}
 #endif
 	//Always redraw the hand pin
@@ -466,8 +462,11 @@ void handle_tick(struct tm *tick_time, TimeUnits units_changed) {
 }
 
 void handle_init() {
-
+	current_time = time(NULL);
+	t = localtime(&current_time);
+	
 	window = window_create();
+	window_stack_push(window, true /*animated */);
     window_set_background_color(window, BackgroundColor);
 	
 	/* Main Watch Face */
@@ -497,7 +496,6 @@ void handle_init() {
 	text_layer_set_background_color(sundown_layer, GColorClear);
 	layer_add_child(window_get_root_layer(window), text_layer_get_layer(sundown_layer));
 
-
 #if SHOW_DATE
 	/* Date */
 	date_layer = text_layer_create(GRect((int)(144/2 - 15), (int)(144/2 + 20), 30, 30));
@@ -520,7 +518,6 @@ void handle_init() {
 	layer_set_update_proc(orbiting_body_layer, draw_orbiting_body);
 	layer_add_child(watch_face_layer, orbiting_body_layer);
 	layer_set_frame(orbiting_body_layer, GRect(0, 0, 144, 144));
-
 	/* Time (aka Clock Hands) */
 #if SHOW_SECONDS
 	//Second Hand
@@ -551,7 +548,6 @@ void handle_init() {
 	hand_pin_layer = layer_create(layer_get_frame(watch_face_layer));
 	layer_set_update_proc(hand_pin_layer, draw_hand_pin);
 	layer_add_child(watch_face_layer, hand_pin_layer);
-
 	
 	tick_timer_service_subscribe(SECOND_UNIT, handle_tick);
 }
