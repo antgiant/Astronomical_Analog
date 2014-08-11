@@ -250,11 +250,11 @@ void draw_watch_face(Layer *layer, GContext *ctx) {
 	GRect layer_rect = layer_get_bounds(layer);
 	int layer_radius = 70;
 	
-	//Draw Watch Background
-	graphics_fill_circle(ctx, grect_center_point(&layer_rect), layer_radius);
-
 	//Only draw Sunlight layer if GPS fix exists
 	if (have_gps_fix) {
+		//Draw Watch Background
+		graphics_fill_circle(ctx, grect_center_point(&layer_rect), layer_radius);
+
 		draw_night_path(layer_rect, ctx);
 		graphics_context_set_stroke_color(ctx, ForegroundColor);
 		graphics_draw_circle(ctx, grect_center_point(&layer_rect), (layer_radius - 1));
@@ -263,8 +263,13 @@ void draw_watch_face(Layer *layer, GContext *ctx) {
 	}
 
 #if SHOW_RING
-	if (layer_radius > 2) {
-		graphics_draw_circle(ctx, grect_center_point(&layer_rect), (layer_radius - 2));
+	int offset = 2;
+	if (!have_gps_fix) {
+		graphics_context_set_stroke_color(ctx, ForegroundColor);
+		offset = 0;
+	}
+	if (layer_radius > offset) {
+		graphics_draw_circle(ctx, grect_center_point(&layer_rect), (layer_radius - offset));
 	}
 #endif
 }
