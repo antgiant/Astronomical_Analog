@@ -9,15 +9,15 @@
     "resources": {
         "media": [
             {
+                "file": "data/resource_map.json",
+                "name": "DUMMY",
+                "type": "raw"
+            },
+            {
                 "file": "images/Analog.png",
                 "menuIcon": true,
                 "name": "IMAGE_ICON",
                 "type": "png"
-            },
-            {
-                "file": "data/resource_map.json",
-                "name": "DUMMY",
-                "type": "raw"
             }
         ]
     },

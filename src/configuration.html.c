@@ -26,43 +26,43 @@
           </div>
 
           <div data-role="fieldcontain">
+            <label for="show-date">Show Date:</label>
             <select name="show-date" id="show-date" data-role="slider">
               <option value="on">On</option>
               <option value="off">Off</option>
             </select>
-            <label for="show-date"> :Show Date</label>
           </div>
 
           <div data-role="fieldcontain">
+            <label for="show-ring">Show Outer Ring:</label>
             <select name="show-ring" id="show-ring" data-role="slider">
               <option value="on">On</option>
               <option value="off">Off</option>
             </select>
-            <label for="show-ring"> :Show Outer Ring</label>
           </div>
 
           <div data-role="fieldcontain">
+            <label for="low-res-time">Minimal Updates (Hour hand only moves once an hour, etc.):</label>
             <select name="low-res-time" id="low-res-time" data-role="slider">
               <option value="off">Off</option>
               <option value="on">On</option>
             </select>
-            <label for="low-res-time"> :Minimal Updates (Hour hand only moves once an hour, etc.)</label>
           </div>
 
           <div data-role="fieldcontain">
+            <label for="inverted">Invert Color Scheme:</label>
             <select name="inverted" id="inverted" data-role="slider">
               <option value="off">Off</option>
               <option value="on">On</option>
             </select>
-            <label for="inverted"> :Invert Color Scheme</label>
           </div>
 
           <div data-role="fieldcontain">
+            <label for="east-to-west-orb-rotation">Proper Orbit Direction (i.e. make it East to West instead of Clockwise.):</label>
             <select name="east-to-west-orb-rotation" id="east-to-west-orb-rotation" data-role="slider">
               <option value="off">Off</option>
               <option value="on">On</option>
             </select>
-            <label for="east-to-west-orb-rotation"> :Proper Orbit Direction (i.e. make it East to West instead of Clockwise.)</label>
           </div>
 
           <div class="ui-body ui-body-b">
