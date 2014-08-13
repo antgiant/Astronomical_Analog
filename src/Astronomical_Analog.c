@@ -4,7 +4,7 @@
 /*   ------- Config Secion -------     */
 #define SHOW_SECONDS true
 #define SHOW_DATE true
-#define SHOW_RING true
+#define SHOW_RING false
 //LOW_RES_TIME means only updating when needed (better for battery assuming pebble is smart enough to only paint changed pixels)
 #define LOW_RES_TIME false
 #define INVERTED false
