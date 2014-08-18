@@ -108,6 +108,7 @@
 		for( key in obj ) {
           $("#"+[key]).val(obj[key]).attr('selected',true);
           $("#"+[key]).val(obj[key]).slider("refresh");       
+		}
       });
     </script>
   </body>
