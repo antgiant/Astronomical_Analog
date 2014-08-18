@@ -106,9 +106,8 @@
         //Set Options to whatever is passed in.
 		var obj = jQuery.parseJSON(decodeURIComponent(window.location.search.substring(window.location.search.substring(1).indexOf("?") + 2)));
 		for( key in obj ) {
-          $(key).val(obj[key]);
-        }
-        
+          $("#"+[key]).val(obj[key]).attr('selected',true);
+          $("#"+[key]).val(obj[key]).slider("refresh");       
       });
     </script>
   </body>
