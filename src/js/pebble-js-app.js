@@ -1,4 +1,5 @@
 var initialized = false;
+var options = "";
 
 Pebble.addEventListener("ready", function() {
   console.log("ready called!");
@@ -8,7 +9,7 @@ Pebble.addEventListener("ready", function() {
 Pebble.addEventListener("showConfiguration", function() {
   console.log("showing configuration");
 //  Pebble.openURL('http://assets.getpebble.com.s3-website-us-east-1.amazonaws.com/pebble-js/configurable.html');
-	Pebble.openURL('http://htmlpreview.github.io/?https://github.com/antgiant/Astronomical_Analog/blob/SDK-2/src/configuration.html.c');
+	Pebble.openURL('http://htmlpreview.github.io/?https://github.com/antgiant/Astronomical_Analog/blob/SDK-2/src/configuration.html.c?'+options);
 });
 
 Pebble.addEventListener("webviewclosed", function(e) {

@@ -103,6 +103,13 @@
           document.location = location;
         });
 
+        //Set Options to whatever is passed in.
+        var options_array = (window.location.search.substring(1)).split('&');
+        for(var i = 0; i < options_array.length; i++){
+          var option = options_array[i].split('=');
+          $(option[0]).val(option[1]);
+        }
+        
       });
     </script>
   </body>
