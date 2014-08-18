@@ -104,10 +104,9 @@
         });
 
         //Set Options to whatever is passed in.
-        var options_array = (window.location.search.substring(1)).split('&');
-        for(var i = 0; i < options_array.length; i++){
-          var option = options_array[i].split('=');
-          $(option[0]).val(option[1]);
+		var obj = jQuery.parseJSON(decodeURIComponent(window.location.search.substring(1)));
+		for( key in obj ) {
+          $(key).val(obj[key]);
         }
         
       });
