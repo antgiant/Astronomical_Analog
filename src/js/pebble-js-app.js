@@ -9,14 +9,15 @@ Pebble.addEventListener("ready", function() {
 Pebble.addEventListener("showConfiguration", function() {
   console.log("showing configuration");
 //  Pebble.openURL('http://assets.getpebble.com.s3-website-us-east-1.amazonaws.com/pebble-js/configurable.html');
-	Pebble.openURL('http://htmlpreview.github.io/?https://github.com/antgiant/Astronomical_Analog/blob/SDK-2/src/configuration.html.c?'+encodeURIComponent(JSON.stringify(options)));
+  console.log('http://htmlpreview.github.io/?https://github.com/antgiant/Astronomical_Analog/blob/SDK-2/src/configuration.html.c?'+encodeURIComponent(JSON.stringify(options)));
+  Pebble.openURL('http://htmlpreview.github.io/?https://github.com/antgiant/Astronomical_Analog/blob/SDK-2/src/configuration.html.c?'+encodeURIComponent(JSON.stringify(options)));
 });
 
 Pebble.addEventListener("webviewclosed", function(e) {
   console.log("configuration closed");
   // webview closed
   //console.log("Response = "+dumpObj(e, "e", "    ", 9));
-  var options = JSON.parse(decodeURIComponent(e.response));
+  options = JSON.parse(decodeURIComponent(e.response));
   console.log("Options = " + JSON.stringify(options));
 });
 
