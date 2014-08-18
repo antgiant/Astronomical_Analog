@@ -81,7 +81,7 @@
           'show-date': $("#show-date").val(),
           'show-ring': $("#show-ring").val(),
           'low-res-time': $("#low-res-time").val(),
-          'inverteds': $("#inverted").val(),
+          'inverted': $("#inverted").val(),
           'east-to-west-orb-rotation': $("#east-to-west-orb-rotation").val(),
 //          'checkbox-sunchips': $("#checkbox-sunchips").is(':checked')
         }
