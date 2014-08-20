@@ -70,6 +70,7 @@ double sun_angle = 90.833; //This is the official angle of the sun for sunrise/s
 bool have_gps_fix = false;
 time_t current_time;
 struct tm *t;
+const uint32_t CONFIG_LOCATION = 0;
 config myconfig;
 
 //Provides the ability to move something in a circle clockwise by degrees (0 = Top center)
@@ -475,6 +476,9 @@ void handle_tick(struct tm *tick_time, TimeUnits units_changed) {
 }
 
 void handle_init() {
+	//Load saved config information from local watch storage
+	persist_read_data(CONFIG_LOCATION, &myconfig, sizeof(myconfig));
+
 	current_time = time(NULL);
 	t = localtime(&current_time);
 	
@@ -566,6 +570,9 @@ void handle_init() {
 }
 
 void handle_deinit() {
+	//Save config data to local watch storage
+	persist_write_data(CONFIG_LOCATION, &myconfig, sizeof(myconfig));
+
 	layer_destroy(hand_pin_layer);
 	gpath_destroy(hour_hand);
 	layer_destroy(hour_layer);
