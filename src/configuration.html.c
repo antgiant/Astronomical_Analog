@@ -18,32 +18,32 @@
       <div data-role="content">
         <form name="config">
           <div data-role="fieldcontain">
-            <label for="show-seconds">Show Second Hand:</label>
-            <select name="show-seconds" id="show-seconds" data-role="slider">
+            <label for="show_seconds">Show Second Hand:</label>
+            <select name="show_seconds" id="show_seconds" data-role="slider">
               <option value="off">Off</option>
               <option value="on">On</option>
             </select>
           </div>
 
           <div data-role="fieldcontain">
-            <label for="show-date">Show Date:</label>
-            <select name="show-date" id="show-date" data-role="slider">
+            <label for="show_date">Show Date:</label>
+            <select name="show_date" id="show_date" data-role="slider">
               <option value="off">Off</option>
               <option value="on">On</option>
             </select>
           </div>
 
           <div data-role="fieldcontain">
-            <label for="show-ring">Show Outer Ring:</label>
-            <select name="show-ring" id="show-ring" data-role="slider">
+            <label for="show_ring">Show Outer Ring:</label>
+            <select name="show_ring" id="show_ring" data-role="slider">
               <option value="off">Off</option>
               <option value="on">On</option>
             </select>
           </div>
 
           <div data-role="fieldcontain">
-            <label for="low-res-time">Minimal Updates (Hour hand only moves once an hour, etc.):</label>
-            <select name="low-res-time" id="low-res-time" data-role="slider">
+            <label for="low_res_time">Minimal Updates (Hour hand only moves once an hour, etc.):</label>
+            <select name="low_res_time" id="low_res_time" data-role="slider">
               <option value="off">Off</option>
               <option value="on">On</option>
             </select>
@@ -58,8 +58,8 @@
           </div>
 
           <div data-role="fieldcontain">
-            <label for="east-to-west-orb-rotation">Proper Orbit Direction (i.e. make it East to West instead of Clockwise.):</label>
-            <select name="east-to-west-orb-rotation" id="east-to-west-orb-rotation" data-role="slider">
+            <label for="east_to_west_orb_rotation">Proper Orbit Direction (i.e. make it East to West instead of Clockwise.):</label>
+            <select name="east_to_west_orb_rotation" id="east_to_west_orb_rotation" data-role="slider">
               <option value="off">Off</option>
               <option value="on">On</option>
             </select>
