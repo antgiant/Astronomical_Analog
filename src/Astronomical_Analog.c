@@ -478,6 +478,7 @@ void handle_tick(struct tm *tick_time, TimeUnits units_changed) {
 void handle_init() {
 	//Load saved config information from local watch storage
 	persist_read_data(CONFIG_LOCATION, &myconfig, sizeof(myconfig));
+	APP_LOG(APP_LOG_LEVEL_DEBUG, "Loaded Config information from Watch");
 
 	current_time = time(NULL);
 	t = localtime(&current_time);
@@ -572,6 +573,7 @@ void handle_init() {
 void handle_deinit() {
 	//Save config data to local watch storage
 	persist_write_data(CONFIG_LOCATION, &myconfig, sizeof(myconfig));
+	APP_LOG(APP_LOG_LEVEL_DEBUG, "Saved Config information to Watch");
 
 	layer_destroy(hand_pin_layer);
 	gpath_destroy(hour_hand);
