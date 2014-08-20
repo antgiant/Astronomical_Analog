@@ -28,16 +28,16 @@
           <div data-role="fieldcontain">
             <label for="show-date">Show Date:</label>
             <select name="show-date" id="show-date" data-role="slider">
-              <option value="on">On</option>
               <option value="off">Off</option>
+              <option value="on">On</option>
             </select>
           </div>
 
           <div data-role="fieldcontain">
             <label for="show-ring">Show Outer Ring:</label>
             <select name="show-ring" id="show-ring" data-role="slider">
-              <option value="on">On</option>
               <option value="off">Off</option>
+              <option value="on">On</option>
             </select>
           </div>
 
