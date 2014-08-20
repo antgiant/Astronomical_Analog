@@ -1,5 +1,13 @@
 var initialized = false;
-var options = "";
+//Adding default options.
+var options = {
+	"show-seconds":"on",
+	"show-date":"on",
+	"show-ring":"off",
+	"low-res-time":"off",
+	"inverted":"off",
+	"east-to-west-orb-rotation":"on"
+};
 
 Pebble.addEventListener("ready", function() {
   console.log("ready called!");
