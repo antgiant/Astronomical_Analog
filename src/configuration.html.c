@@ -78,7 +78,7 @@
       function saveOptions() {
         var options = {}
         //Add all textual values
-        $('textarea, select, [type="hidden"], [type="password"], [type="text"]').each(function(){options[$(this).attr('id')] = $(this).val();})
+        $('textarea, select, [type="hidden"], [type="password"], [type="text"]').each(function(){if ($(this).is('select') && $(this).val() == "on") {options[$(this).attr('id')] = true;} else if ($(this).is('select') && $(this).val() == "off") {options[$(this).attr('id')] = false;} else {options[$(this).attr('id')] = $(this).val();}})
         //Add all checkbox type values
         $('[type="radio"], [type="checkbox"]').each(function(){options[$(this).attr('id')] = $(this).is(':checked');})
         return options;
@@ -102,7 +102,13 @@
         //Set Options to whatever is passed in.
 		var obj = jQuery.parseJSON(decodeURIComponent(window.location.search.substring(window.location.search.substring(1).indexOf("?") + 2)));
 		for(key in obj) {
-			$("#"+[key]).val(obj[key]);
+			if ($("#"+[key]).is('select') && obj[key]) {
+				$("#"+[key]) = "on";
+			} else if ($("#"+[key]).is('select') && !obj[key]) {
+				$("#"+[key]) = "off";
+			} else {
+				$("#"+[key]).val(obj[key]);
+			}
 			$("#"+[key]).val(obj[key]).slider("refresh");       
 		}
       });
