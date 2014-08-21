@@ -103,9 +103,9 @@
 		var obj = jQuery.parseJSON(decodeURIComponent(window.location.search.substring(window.location.search.substring(1).indexOf("?") + 2)));
 		for(key in obj) {
 			if ($("#"+[key]).is('select') && obj[key]) {
-				$("#"+[key]) = "on";
+				$("#"+[key]).val("on");
 			} else if ($("#"+[key]).is('select') && !obj[key]) {
-				$("#"+[key]) = "off";
+				$("#"+[key]).val("off");
 			} else {
 				$("#"+[key]).val(obj[key]);
 			}
