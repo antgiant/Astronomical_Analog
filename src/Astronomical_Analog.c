@@ -39,7 +39,7 @@ GPathInfo night_pattern_points = {
 	.num_points = 7,
 	.points = (GPoint []) {{0, 0}, {1, 0}, {2, 2}, {3, 0}, {4, 0}, {4, 4}, {0, 4}}
 };
- typedef struct {
+ typedef struct config {
 	 bool show_seconds;
 	 bool show_date;
 	 bool show_ring;
@@ -48,6 +48,8 @@ GPathInfo night_pattern_points = {
 	 bool east_to_west_orb_rotation;
  } __attribute__((__packed__)) config;
 
+//Initialize with default values
+config myconfig = {true, true, false, false, false, true};
 Window *window;
 Layer *watch_face_layer;
 Layer *hour_layer;
@@ -71,7 +73,6 @@ bool have_gps_fix = false;
 time_t current_time;
 struct tm *t;
 const uint32_t CONFIG_LOCATION = 0;
-config myconfig;
 
 //Provides the ability to move something in a circle clockwise by degrees (0 = Top center)
 GPoint move_by_degrees(GPoint origin, int radius, int degrees) {
