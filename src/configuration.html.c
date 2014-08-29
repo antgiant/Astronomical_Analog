@@ -109,7 +109,7 @@
 			} else {
 				$("#"+[key]).val(obj[key]);
 			}
-			$("#"+[key]).val(obj[key]).slider("refresh");       
+			$("#"+[key]).slider("refresh");       
 		}
       });
     </script>
