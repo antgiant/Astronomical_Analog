@@ -2,16 +2,16 @@
 #include "suncalc.h"
 
 /*   ------- Config Secion -------     */
-#define SHOW_SECONDS true
-#define SHOW_DATE true
-#define SHOW_RING false
-//LOW_RES_TIME means only updating when needed (better for battery assuming pebble is smart enough to only paint changed pixels)
-#define LOW_RES_TIME false
-#define INVERTED false
-#define EAST_TO_WEST_ORB_ROTATION true //as opposed to clockwise
+#define SHOW_SECONDS_OLD true
+#define SHOW_DATE_OLD true
+#define SHOW_RING_OLD false
+//LOW_RES_TIME_OLD means only updating when needed (better for battery assuming pebble is smart enough to only paint changed pixels)
+#define LOW_RES_TIME_OLD false
+#define INVERTED_OLD false
+#define EAST_TO_WEST_ORB_ROTATION_OLD true //as opposed to clockwise
 /*   ----- End Config Secion -----     */
 	
-#if !INVERTED
+#if !INVERTED_OLD
 const GColor BackgroundColor = GColorBlack;
 const GColor ForegroundColor = GColorWhite;
 #else
@@ -39,17 +39,7 @@ GPathInfo night_pattern_points = {
 	.num_points = 7,
 	.points = (GPoint []) {{0, 0}, {1, 0}, {2, 2}, {3, 0}, {4, 0}, {4, 4}, {0, 4}}
 };
- typedef struct config {
-	 bool show_seconds;
-	 bool show_date;
-	 bool show_ring;
-	 bool low_res_time;
-	 bool inverted;
-	 bool east_to_west_orb_rotation;
- } __attribute__((__packed__)) config;
 
-//Initialize with default values
-config myconfig = {true, true, false, false, false, true};
 Window *window;
 Layer *watch_face_layer;
 Layer *hour_layer;
@@ -72,7 +62,65 @@ double sun_angle = 90.833; //This is the official angle of the sun for sunrise/s
 bool have_gps_fix = false;
 time_t current_time;
 struct tm *t;
-const uint32_t CONFIG_LOCATION = 0;
+enum ConfigOptions {
+	CONFIG_VERSION,
+	SHOW_SECONDS,
+	SHOW_DATE,
+	SHOW_RING,
+	LOW_RES_TIME,
+	INVERTED,
+	EAST_TO_WEST_ORB_ROTATION,
+};
+bool show_seconds = true;
+bool show_date = true;
+bool show_ring = false;
+bool low_res_time = false;
+bool inverted = false;
+bool east_to_west_orb_rotation = true;
+
+//Load saved config information from local watch storage, then optionally pull from watch storage
+void load_saved_config_options() {
+	int version = 1;
+	if (persist_exists(CONFIG_VERSION)) {
+		persist_read_data(CONFIG_VERSION, &version, sizeof(version));
+		APP_LOG(APP_LOG_LEVEL_DEBUG, "Loaded Config Version");	
+	}
+	if (version < 1) {
+		//Deal with old data
+		APP_LOG(APP_LOG_LEVEL_DEBUG, "Upgrading Config data");	
+	}
+	else if (version > 1) {
+		//Use default vaules as the data is from the future
+		APP_LOG(APP_LOG_LEVEL_DEBUG, "Using defaults as config data is from the future");	
+	}
+	else {
+		//Load options from watch
+		if (persist_exists(SHOW_SECONDS)) {
+			persist_read_data(SHOW_SECONDS, &show_seconds, sizeof(show_seconds));
+			APP_LOG(APP_LOG_LEVEL_DEBUG, "Loaded show_seconds variable");	
+		}
+		if (persist_exists(SHOW_DATE)) {
+			persist_read_data(SHOW_DATE, &show_date, sizeof(show_date));
+			APP_LOG(APP_LOG_LEVEL_DEBUG, "Loaded show_date variable");	
+		}
+		if (persist_exists(SHOW_RING)) {
+			persist_read_data(SHOW_RING, &show_ring, sizeof(show_ring));
+			APP_LOG(APP_LOG_LEVEL_DEBUG, "Loaded show_ring variable");	
+		}
+		if (persist_exists(LOW_RES_TIME)) {
+			persist_read_data(LOW_RES_TIME, &low_res_time, sizeof(low_res_time));
+			APP_LOG(APP_LOG_LEVEL_DEBUG, "Loaded low_res_time variable");	
+		}
+		if (persist_exists(INVERTED)) {
+			persist_read_data(INVERTED, &inverted, sizeof(inverted));
+			APP_LOG(APP_LOG_LEVEL_DEBUG, "Loaded inverted variable");	
+		}
+		if (persist_exists(EAST_TO_WEST_ORB_ROTATION)) {
+			persist_read_data(EAST_TO_WEST_ORB_ROTATION, &east_to_west_orb_rotation, sizeof(east_to_west_orb_rotation));
+			APP_LOG(APP_LOG_LEVEL_DEBUG, "Loaded east_to_west_orb_rotation variable");	
+		}
+	}
+}
 
 //Provides the ability to move something in a circle clockwise by degrees (0 = Top center)
 GPoint move_by_degrees(GPoint origin, int radius, int degrees) {
@@ -127,7 +175,7 @@ int next_rectangle_corner(GRect rect, GPoint point) {
 	else if (point.y == rect.size.h/2) {
 		corner = 2;
 	}
-#if EAST_TO_WEST_ORB_ROTATION
+#if EAST_TO_WEST_ORB_ROTATION_OLD
 	if (corner == 1 || corner == 3) {
 		corner = (corner + 2)%4;
 	}
@@ -161,7 +209,7 @@ void draw_night_path(GRect rect, GContext *ctx) {
 
 		GPathInfo corner_points = {
 			.num_points = 4,
-#if EAST_TO_WEST_ORB_ROTATION
+#if EAST_TO_WEST_ORB_ROTATION_OLD
 			.points = (GPoint []) {{-rect.size.w/2, -rect.size.h/2}, {-rect.size.w/2, rect.size.h/2}, {rect.size.w/2, rect.size.h/2}, {rect.size.w/2, -rect.size.h/2}}
 #else
 			.points = (GPoint []) {{rect.size.w/2, -rect.size.h/2}, {rect.size.w/2, rect.size.h/2}, {-rect.size.w/2, rect.size.h/2}, {-rect.size.w/2, -rect.size.h/2}}
@@ -178,7 +226,7 @@ void draw_night_path(GRect rect, GContext *ctx) {
 		angle_sunup = (15*((suntimes.sunup->tm_hour + 12)%24)) + (suntimes.sunup->tm_min/4);
 		angle_sundown = (15*((suntimes.sundown->tm_hour + 12)%24)) + (suntimes.sundown->tm_min/4);
 	
-#if EAST_TO_WEST_ORB_ROTATION
+#if EAST_TO_WEST_ORB_ROTATION_OLD
         angle_sunup = (360 - angle_sunup);
         angle_sundown = (360 - angle_sundown);
 		angle_diff = angle_sundown - angle_sunup;
@@ -272,7 +320,7 @@ void draw_watch_face(Layer *layer, GContext *ctx) {
 		graphics_context_set_stroke_color(ctx, BackgroundColor);
 	}
 
-#if SHOW_RING
+#if SHOW_RING_OLD
 	int offset = 2;
 	if (!have_gps_fix) {
 		graphics_context_set_stroke_color(ctx, ForegroundColor);
@@ -283,7 +331,7 @@ void draw_watch_face(Layer *layer, GContext *ctx) {
 	}
 #endif
 }
-#if SHOW_DATE
+#if SHOW_DATE_OLD
 void draw_date() {
 	
 	static char dom_text[] = "00";
@@ -313,7 +361,7 @@ void draw_orbiting_body(Layer *layer, GContext *ctx) {
 	//Draw Orbiting Body
 	body_radius = 7;
 	
-#if LOW_RES_TIME
+#if LOW_RES_TIME_OLD
 	//Rotate orbiting body to proper spot (15 degrees per hour)
 	angle = (15*hour);
 #else
@@ -322,7 +370,7 @@ void draw_orbiting_body(Layer *layer, GContext *ctx) {
 	//Rotate orbiting body to proper spot (15 degrees per hour + 1 degree per 4 minutes)
 	angle = (15*hour) + (minute/4);
 #endif
-#if EAST_TO_WEST_ORB_ROTATION
+#if EAST_TO_WEST_ORB_ROTATION_OLD
         angle = -(angle - 360);
 #endif	
 	graphics_fill_circle(ctx, move_by_degrees(center_point, layer_radius - body_radius - 10, angle), body_radius);
@@ -353,7 +401,7 @@ void draw_hour_hand(Layer *layer, GContext *ctx) {
 
 	hour = t->tm_hour%12;
 
-#if LOW_RES_TIME
+#if LOW_RES_TIME_OLD
 	//Rotate hour hand to to proper spot (30 degrees per hour)
 	gpath_rotate_to(hour_hand, (TRIG_MAX_ANGLE / 360) * (30*hour));
 #else
@@ -376,7 +424,7 @@ void draw_minute_hand(Layer *layer, GContext *ctx) {
 	minute = t->tm_min;
 	
 
-#if LOW_RES_TIME || !SHOW_SECONDS
+#if LOW_RES_TIME_OLD || !SHOW_SECONDS_OLD
 	//Rotate minute hand to to proper spot (6 degrees per minute)
 	gpath_rotate_to(minute_hand, (TRIG_MAX_ANGLE / 360) * (6*minute));
 #else
@@ -389,7 +437,7 @@ void draw_minute_hand(Layer *layer, GContext *ctx) {
 	gpath_draw_filled(ctx, minute_hand);
 	gpath_draw_outline(ctx, minute_hand);
 }
-#if SHOW_SECONDS
+#if SHOW_SECONDS_OLD
 void draw_second_hand(Layer *layer, GContext *ctx) {
 	int second;
 
@@ -423,7 +471,7 @@ void handle_tick(struct tm *tick_time, TimeUnits units_changed) {
 	
 	//NOTE: This is a Bit Mask Check not a and &&
 	//Secondary Note: units_changed == 0 catches initialzation tick
-#if SHOW_DATE
+#if SHOW_DATE_OLD
 	if (units_changed == 0 || units_changed & DAY_UNIT) {
         draw_date();
 	}
@@ -433,15 +481,15 @@ void handle_tick(struct tm *tick_time, TimeUnits units_changed) {
 		//http_time_request(); //Update Sunrise/set location & data
 
 //No need to seperatly update hour hand if done by another hand
-#if LOW_RES_TIME
+#if LOW_RES_TIME_OLD
         layer_mark_dirty(hour_layer);
 		layer_mark_dirty(orbiting_body_layer);
 #endif
 	}
-#if LOW_RES_TIME || !SHOW_SECONDS
+#if LOW_RES_TIME_OLD || !SHOW_SECONDS_OLD
 	if (units_changed == 0 || units_changed & MINUTE_UNIT) {
         layer_mark_dirty(minute_layer);
-#if !LOW_RES_TIME
+#if !LOW_RES_TIME_OLD
 		//Only move hour hand every two minutes (due to 2 minutes per degree rotation).
 		if (units_changed == 0 || tick_time->tm_min%2 == 0) {
         	layer_mark_dirty(hour_layer);
@@ -453,10 +501,10 @@ void handle_tick(struct tm *tick_time, TimeUnits units_changed) {
   #endif
 	}
 #endif
-#if SHOW_SECONDS
+#if SHOW_SECONDS_OLD
   	if (units_changed == 0 || units_changed & SECOND_UNIT) {
         layer_mark_dirty(second_layer);
-#if !LOW_RES_TIME
+#if !LOW_RES_TIME_OLD
 		//Only move minute hand every two seconds (due to 10 seconds per degree rotation).
 		if (units_changed == 0 || tick_time->tm_sec%10 == 0) {
         	layer_mark_dirty(minute_layer);
@@ -477,9 +525,7 @@ void handle_tick(struct tm *tick_time, TimeUnits units_changed) {
 }
 
 void handle_init() {
-	//Load saved config information from local watch storage
-	persist_read_data(CONFIG_LOCATION, &myconfig, sizeof(myconfig));
-	APP_LOG(APP_LOG_LEVEL_DEBUG, "Loaded Config information from Watch");
+	load_saved_config_options();
 
 	current_time = time(NULL);
 	t = localtime(&current_time);
@@ -492,7 +538,7 @@ void handle_init() {
 	watch_face_layer = layer_create(GRect(0, 14, 144, 144));
 	layer_set_update_proc(watch_face_layer, draw_watch_face);
 	layer_add_child(window_get_root_layer(window), watch_face_layer);
-#if EAST_TO_WEST_ORB_ROTATION
+#if EAST_TO_WEST_ORB_ROTATION_OLD
 	sunup_layer = text_layer_create(GRect((int)(144 - 44), (int)(144), 40, 30));
 	text_layer_set_text_alignment(sunup_layer, GTextAlignmentRight);
 #else
@@ -503,7 +549,7 @@ void handle_init() {
 	text_layer_set_text_color(sunup_layer, ForegroundColor);
 	text_layer_set_background_color(sunup_layer, GColorClear);
 	layer_add_child(window_get_root_layer(window), text_layer_get_layer(sunup_layer));
-#if EAST_TO_WEST_ORB_ROTATION
+#if EAST_TO_WEST_ORB_ROTATION_OLD
 	sundown_layer = text_layer_create(GRect((int)(4), (int)(144), 40, 30));
 	text_layer_set_text_alignment(sundown_layer, GTextAlignmentLeft);
 #else
@@ -515,7 +561,7 @@ void handle_init() {
 	text_layer_set_background_color(sundown_layer, GColorClear);
 	layer_add_child(window_get_root_layer(window), text_layer_get_layer(sundown_layer));
 
-#if SHOW_DATE
+#if SHOW_DATE_OLD
 	/* Date */
 	date_layer = text_layer_create(GRect((int)(144/2 - 15), (int)(144/2 + 20), 30, 30));
 	text_layer_set_font(date_layer, fonts_get_system_font(FONT_KEY_GOTHIC_24_BOLD));
@@ -538,7 +584,7 @@ void handle_init() {
 	layer_add_child(watch_face_layer, orbiting_body_layer);
 	layer_set_frame(orbiting_body_layer, GRect(0, 0, 144, 144));
 	/* Time (aka Clock Hands) */
-#if SHOW_SECONDS
+#if SHOW_SECONDS_OLD
 	//Second Hand
 	second_layer = layer_create(layer_get_frame(watch_face_layer));
 	layer_set_update_proc(second_layer, draw_second_hand);
@@ -573,7 +619,7 @@ void handle_init() {
 
 void handle_deinit() {
 	//Save config data to local watch storage
-	persist_write_data(CONFIG_LOCATION, &myconfig, sizeof(myconfig));
+//	persist_write_data(CONFIG_LOCATION, &myconfig, sizeof(myconfig));
 	APP_LOG(APP_LOG_LEVEL_DEBUG, "Saved Config information to Watch");
 
 	layer_destroy(hand_pin_layer);

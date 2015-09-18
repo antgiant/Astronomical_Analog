@@ -21,6 +21,7 @@
             }
         ]
     },
+    "sdkVersion": "2",
     "shortName": "Astronomical Analog",
     "uuid": "E32A8BDA-E82D-4517-A69D-A92963FA8420",
     "versionCode": 1,
