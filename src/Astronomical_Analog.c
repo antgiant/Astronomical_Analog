@@ -11,27 +11,21 @@
 #define EAST_TO_WEST_ORB_ROTATION_OLD true //as opposed to clockwise
 /*   ----- End Config Secion -----     */
 	
-#if !INVERTED_OLD
-const GColor BackgroundColor = GColorBlack;
-const GColor ForegroundColor = GColorWhite;
-#else
-const GColor BackgroundColor = GColorWhite;
-const GColor ForegroundColor = GColorBlack;
-#endif
+GColor BackgroundColor, ForegroundColor;
 	
-static const GPathInfo HOUR_HAND_POINTS = {
+static GPathInfo HOUR_HAND_POINTS = {
 	.num_points = 5,
 	.points = (GPoint []) {{-5, 14}, {-5, 0}, {0, -48}, {5, 0}, {5, 14}}
 };
-static const GPathInfo MINUTE_HAND_POINTS = {
+static GPathInfo MINUTE_HAND_POINTS = {
 	.num_points = 5,
 	.points = (GPoint []) {{-5, 14}, {-5, 0}, {0, -65}, {5, 0}, {5, 14}}
 };
-static const GPathInfo SECOND_HAND_POINTS_BACKGROUND = {
+static GPathInfo SECOND_HAND_POINTS_BACKGROUND = {
 	.num_points = 2,
 	.points = (GPoint []) {{-2, 14}, {-2, -65}}
 };
-static const GPathInfo SECOND_HAND_POINTS_FOREGROUND = {
+static GPathInfo SECOND_HAND_POINTS_FOREGROUND = {
 	.num_points = 2,
 	.points = (GPoint []) {{2, 14}, {2, -65}}
 };
@@ -525,6 +519,13 @@ void handle_tick(struct tm *tick_time, TimeUnits units_changed) {
 }
 
 void handle_init() {
+#if !INVERTED_OLD
+	BackgroundColor = GColorBlack;
+	ForegroundColor = GColorWhite;
+#else
+	BackgroundColor = GColorWhite;
+	ForegroundColor = GColorBlack;
+#endif
 	load_saved_config_options();
 
 	current_time = time(NULL);
