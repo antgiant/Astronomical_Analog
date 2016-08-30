@@ -8,7 +8,6 @@
 /*   ------- Config Secion -------     */
 #define SHOW_SECONDS_OLD true
 #define SHOW_DATE_OLD true
-#define SHOW_RING_OLD false
 //LOW_RES_TIME_OLD means only updating when needed (better for battery assuming pebble is smart enough to only paint changed pixels)
 #define LOW_RES_TIME_OLD false
 #define INVERTED_OLD false
@@ -64,7 +63,6 @@ enum ConfigOptions {
 	CONFIG_VERSION,
 	SHOW_SECONDS,
 	SHOW_DATE,
-	SHOW_RING,
 	LOW_RES_TIME,
 	INVERTED,
 	EAST_TO_WEST_ORB_ROTATION,
@@ -426,16 +424,16 @@ void draw_watch_face(Layer *layer, GContext *ctx) {
 		graphics_context_set_stroke_color(ctx, BackgroundColor);
 	}
 
-#if SHOW_RING_OLD
-	int offset = 2;
-	if (!have_gps_fix) {
-		graphics_context_set_stroke_color(ctx, ForegroundColor);
-		offset = 0;
+	if (show_ring) {
+		int offset = 2;
+		if (!have_gps_fix) {
+			graphics_context_set_stroke_color(ctx, ForegroundColor);
+			offset = 0;
+		}
+		if (layer_radius > offset) {
+			graphics_draw_circle(ctx, grect_center_point(&layer_rect), (layer_radius - offset));
+		}
 	}
-	if (layer_radius > offset) {
-		graphics_draw_circle(ctx, grect_center_point(&layer_rect), (layer_radius - offset));
-	}
-#endif
 }
 #if SHOW_DATE_OLD
 void draw_date() {
@@ -639,8 +637,11 @@ void handle_init() {
 	BackgroundColor = GColorWhite;
 	ForegroundColor = GColorBlack;
 #endif
-	load_saved_config_options();
 
+	load_saved_config_options();
+	app_message_register_inbox_received(&handle_appmessage_receive);
+	app_message_open(INBOX_SIZE, OUTBOX_SIZE);
+	
 	current_time = time(NULL);
 	t = localtime(&current_time);
 	

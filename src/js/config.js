@@ -15,19 +15,19 @@ module.exports = [
 	  "type": "toggle",
 	  "messageKey": "show_ring",
 	  "label": "Show Outer Ring",
-	  "defaultValue": true
+	  "defaultValue": false
 	},
 	{
 	  "type": "toggle",
 	  "messageKey": "low_res_time",
 	  "label": "Minimal Updates (Hour hand only moves once an hour, etc.)",
-	  "defaultValue": true
+	  "defaultValue": false
 	},
 	{
 	  "type": "toggle",
 	  "messageKey": "inverted",
 	  "label": "Invert Color Scheme",
-	  "defaultValue": true
+	  "defaultValue": false
 	},
 	{
 	  "type": "toggle",
@@ -35,4 +35,8 @@ module.exports = [
 	  "label": "Proper Orbit Direction (i.e. make it East to West instead of Clockwise.)",
 	  "defaultValue": true
 	},
+	{
+ 		"type": "submit",
+ 		"defaultValue": "Save"
+	}
 ];
