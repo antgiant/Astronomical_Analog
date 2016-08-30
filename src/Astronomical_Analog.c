@@ -1,6 +1,10 @@
 #include <pebble.h>
 #include "suncalc.h"
 
+//Last number is the max # of integers to be passed
+#define INBOX_SIZE  (1 + (7+4) * 6)
+#define OUTBOX_SIZE (1 + (7+4) * 6)
+
 /*   ------- Config Secion -------     */
 #define SHOW_SECONDS_OLD true
 #define SHOW_DATE_OLD true
@@ -71,49 +75,157 @@ bool show_ring = false;
 bool low_res_time = false;
 bool inverted = false;
 bool east_to_west_orb_rotation = true;
+bool first_run = true;
 
-//Load saved config information from local watch storage, then optionally pull from watch storage
+//Function declaration so that next function can use it.
+void handle_tick(struct tm *tickE, TimeUnits units_changed);
+
+void update_screen(){
+		tick_timer_service_unsubscribe();
+		tick_timer_service_subscribe(HOUR_UNIT|MINUTE_UNIT|SECOND_UNIT, handle_tick);
+	
+	if (first_run) {
+		first_run = false;
+	}
+
+	APP_LOG(APP_LOG_LEVEL_DEBUG, "Set Watch Style");
+}
+
+void handle_appmessage_receive(DictionaryIterator *iter, void *context) {
+	// Read show seconds preference
+	Tuple *tuple = dict_find(iter, MESSAGE_KEY_show_seconds);
+	if(tuple) {
+		show_seconds = tuple->value->int32;
+		persist_write_int(MESSAGE_KEY_show_seconds, show_seconds);
+		APP_LOG(APP_LOG_LEVEL_DEBUG, "Saved new show seconds preference (%i).", show_seconds);
+		update_screen();
+	} else if (persist_exists(MESSAGE_KEY_show_seconds)) {
+		show_seconds = persist_read_int(MESSAGE_KEY_show_seconds); 
+		APP_LOG(APP_LOG_LEVEL_DEBUG, "Loaded show seconds preference from watch storage. (%i)", show_seconds);
+		update_screen();
+	} else {
+		show_seconds = true; //Default to true 
+		APP_LOG(APP_LOG_LEVEL_DEBUG, "Loaded default show seconds preference (%i). (No saved settings).", show_seconds);
+	}
+	
+	// Read show date preference
+	tuple = dict_find(iter, MESSAGE_KEY_show_date);
+	if(tuple) {
+		show_date = tuple->value->int32;
+		persist_write_int(MESSAGE_KEY_show_date, show_date);
+		APP_LOG(APP_LOG_LEVEL_DEBUG, "Saved new show date preference (%i).", show_date);
+		update_screen();
+	} else if (persist_exists(MESSAGE_KEY_show_date)) {
+		show_seconds = persist_read_int(MESSAGE_KEY_show_date); 
+		APP_LOG(APP_LOG_LEVEL_DEBUG, "Loaded show date preference from watch storage. (%i)", show_date);
+		update_screen();
+	} else {
+		show_date = true; //Default to true 
+		APP_LOG(APP_LOG_LEVEL_DEBUG, "Loaded default show date preference (%i). (No saved settings).", show_date);
+	}
+	
+	// Read show ring preference
+	tuple = dict_find(iter, MESSAGE_KEY_show_ring);
+	if(tuple) {
+		show_ring = tuple->value->int32;
+		persist_write_int(MESSAGE_KEY_show_ring, show_ring);
+		APP_LOG(APP_LOG_LEVEL_DEBUG, "Saved new show ring preference (%i).", show_ring);
+		update_screen();
+	} else if (persist_exists(MESSAGE_KEY_show_ring)) {
+		show_ring = persist_read_int(MESSAGE_KEY_show_ring); 
+		APP_LOG(APP_LOG_LEVEL_DEBUG, "Loaded show ring preference from watch storage. (%i)", show_ring);
+		update_screen();
+	} else {
+		show_ring = false; //Default to false 
+		APP_LOG(APP_LOG_LEVEL_DEBUG, "Loaded default show false preference (%i). (No saved settings).", show_ring);
+	}
+	
+	// Read low resolution time preference
+	tuple = dict_find(iter, MESSAGE_KEY_low_res_time);
+	if(tuple) {
+		low_res_time = tuple->value->int32;
+		persist_write_int(MESSAGE_KEY_low_res_time, low_res_time);
+		APP_LOG(APP_LOG_LEVEL_DEBUG, "Saved new low resolution time preference (%i).", low_res_time);
+		update_screen();
+	} else if (persist_exists(MESSAGE_KEY_low_res_time)) {
+		low_res_time = persist_read_int(MESSAGE_KEY_low_res_time); 
+		APP_LOG(APP_LOG_LEVEL_DEBUG, "Loaded low resolution time preference from watch storage. (%i)", low_res_time);
+		update_screen();
+	} else {
+		low_res_time = false; //Default to false 
+		APP_LOG(APP_LOG_LEVEL_DEBUG, "Loaded default low resolution time preference (%i). (No saved settings).", low_res_time);
+	}
+	
+	// Read inverted colors preference
+	tuple = dict_find(iter, MESSAGE_KEY_inverted);
+	if(tuple) {
+		inverted = tuple->value->int32;
+		persist_write_int(MESSAGE_KEY_inverted, inverted);
+		APP_LOG(APP_LOG_LEVEL_DEBUG, "Saved new inverted colors preference (%i).", inverted);
+		update_screen();
+	} else if (persist_exists(MESSAGE_KEY_inverted)) {
+		inverted = persist_read_int(MESSAGE_KEY_inverted); 
+		APP_LOG(APP_LOG_LEVEL_DEBUG, "Loaded use inverted colors preference from watch storage. (%i)", inverted);
+		update_screen();
+	} else {
+		inverted = true; //Default to true 
+		APP_LOG(APP_LOG_LEVEL_DEBUG, "Loaded default use inverted colors preference (%i). (No saved settings).", inverted);
+	}
+	
+	// Read rotate orb properly preference
+	tuple = dict_find(iter, MESSAGE_KEY_east_to_west_orb_rotation);
+	if(tuple) {
+		east_to_west_orb_rotation = tuple->value->int32;
+		persist_write_int(MESSAGE_KEY_east_to_west_orb_rotation, east_to_west_orb_rotation);
+		APP_LOG(APP_LOG_LEVEL_DEBUG, "Saved new east to west orb rotation preference (%i).", east_to_west_orb_rotation);
+		update_screen();
+	} else if (persist_exists(MESSAGE_KEY_east_to_west_orb_rotation)) {
+		east_to_west_orb_rotation = persist_read_int(MESSAGE_KEY_east_to_west_orb_rotation); 
+		APP_LOG(APP_LOG_LEVEL_DEBUG, "Loaded east to west orb rotation preference from watch storage. (%i)", east_to_west_orb_rotation);
+		update_screen();
+	} else {
+		east_to_west_orb_rotation = true; //Default to true 
+		APP_LOG(APP_LOG_LEVEL_DEBUG, "Loaded east to west orb rotation preference (%i). (No saved settings).", east_to_west_orb_rotation);
+	}
+	APP_LOG(APP_LOG_LEVEL_DEBUG, "Completed processing config data");
+}
+
 void load_saved_config_options() {
-	int version = 1;
-	if (persist_exists(CONFIG_VERSION)) {
-		persist_read_data(CONFIG_VERSION, &version, sizeof(version));
-		APP_LOG(APP_LOG_LEVEL_DEBUG, "Loaded Config Version");	
+	int current_version = 1;
+	int saved_version;
+	if (persist_exists(MESSAGE_KEY_config_version)) {
+		saved_version = persist_read_int(MESSAGE_KEY_config_version);
+		APP_LOG(APP_LOG_LEVEL_DEBUG, "Loaded Config Version (%i)", saved_version);	
+	} else {
+		saved_version = current_version;
+		persist_write_int(MESSAGE_KEY_config_version, saved_version);
+		APP_LOG(APP_LOG_LEVEL_DEBUG, "Saved config version to persistent storage.");
 	}
-	if (version < 1) {
+	if (saved_version < current_version) {
 		//Deal with old data
-		APP_LOG(APP_LOG_LEVEL_DEBUG, "Upgrading Config data");	
+//		APP_LOG(APP_LOG_LEVEL_DEBUG, "Upgrading Config data");	
+		
+//		persist_write_int(MESSAGE_KEY_config_version, current_version);
+		
+//		APP_LOG(APP_LOG_LEVEL_DEBUG, "Upgrade of Config data complete");
 	}
-	else if (version > 1) {
-		//Use default vaules as the data is from the future
+	else if (saved_version > current_version) {
+		show_seconds = true;
+		show_date = true;
+		show_ring = false;
+		low_res_time = false;
+		inverted = false;
+		east_to_west_orb_rotation = true;
 		APP_LOG(APP_LOG_LEVEL_DEBUG, "Using defaults as config data is from the future");	
 	}
-	else {
-		//Load options from watch
-		if (persist_exists(SHOW_SECONDS)) {
-			persist_read_data(SHOW_SECONDS, &show_seconds, sizeof(show_seconds));
-			APP_LOG(APP_LOG_LEVEL_DEBUG, "Loaded show_seconds variable");	
-		}
-		if (persist_exists(SHOW_DATE)) {
-			persist_read_data(SHOW_DATE, &show_date, sizeof(show_date));
-			APP_LOG(APP_LOG_LEVEL_DEBUG, "Loaded show_date variable");	
-		}
-		if (persist_exists(SHOW_RING)) {
-			persist_read_data(SHOW_RING, &show_ring, sizeof(show_ring));
-			APP_LOG(APP_LOG_LEVEL_DEBUG, "Loaded show_ring variable");	
-		}
-		if (persist_exists(LOW_RES_TIME)) {
-			persist_read_data(LOW_RES_TIME, &low_res_time, sizeof(low_res_time));
-			APP_LOG(APP_LOG_LEVEL_DEBUG, "Loaded low_res_time variable");	
-		}
-		if (persist_exists(INVERTED)) {
-			persist_read_data(INVERTED, &inverted, sizeof(inverted));
-			APP_LOG(APP_LOG_LEVEL_DEBUG, "Loaded inverted variable");	
-		}
-		if (persist_exists(EAST_TO_WEST_ORB_ROTATION)) {
-			persist_read_data(EAST_TO_WEST_ORB_ROTATION, &east_to_west_orb_rotation, sizeof(east_to_west_orb_rotation));
-			APP_LOG(APP_LOG_LEVEL_DEBUG, "Loaded east_to_west_orb_rotation variable");	
-		}
-	}
+	
+	//Config is now up to date use handle_appmessage_receive to load the default values
+	DictionaryIterator iter;
+	uint8_t buffer[INBOX_SIZE];
+	dict_write_begin(&iter, buffer, sizeof(buffer));
+	void *context = NULL;
+	handle_appmessage_receive(&iter, context);
+	
 }
 
 //Provides the ability to move something in a circle clockwise by degrees (0 = Top center)
@@ -460,6 +572,7 @@ void draw_second_hand(Layer *layer, GContext *ctx) {
    things appropriately*/
 void handle_tick(struct tm *tick_time, TimeUnits units_changed) {
 
+	APP_LOG(APP_LOG_LEVEL_DEBUG, "Handling Tick Event");
 	current_time = time(NULL);
 	t = localtime(&current_time);
 	
@@ -621,7 +734,7 @@ void handle_init() {
 void handle_deinit() {
 	//Save config data to local watch storage
 //	persist_write_data(CONFIG_LOCATION, &myconfig, sizeof(myconfig));
-	APP_LOG(APP_LOG_LEVEL_DEBUG, "Saved Config information to Watch");
+//	APP_LOG(APP_LOG_LEVEL_DEBUG, "Saved Config information to Watch");
 
 	layer_destroy(hand_pin_layer);
 	gpath_destroy(hour_hand);

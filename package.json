@@ -1,6 +1,8 @@
 {
     "author": "antgiant",
-    "dependencies": {},
+    "dependencies": {
+        "pebble-clay": "^1.0.0"
+    },
     "keywords": [],
     "name": "astronomical-analog",
     "pebble": {
@@ -9,7 +11,15 @@
         ],
         "displayName": "Astronomical Analog",
         "enableMultiJS": true,
-        "messageKeys": [],
+        "messageKeys": [
+            "show_seconds",
+            "show_date",
+            "show_ring",
+            "low_res_time",
+            "inverted",
+            "east_to_west_orb_rotation",
+            "config_version"
+        ],
         "projectType": "native",
         "resources": {
             "media": [
