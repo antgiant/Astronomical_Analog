@@ -6,7 +6,6 @@
 #define OUTBOX_SIZE (1 + (7+4) * 6)
 
 /*   ------- Config Secion -------     */
-#define SHOW_SECONDS_OLD true
 //LOW_RES_TIME_OLD means only updating when needed (better for battery assuming pebble is smart enough to only paint changed pixels)
 #define LOW_RES_TIME_OLD false
 /*   ----- End Config Secion -----     */
@@ -60,6 +59,7 @@ bool have_gps_fix = false;
 time_t current_time;
 struct tm *t;
 bool show_seconds = true;
+bool delayed_show_seconds = false;
 bool show_date = true;
 bool show_ring = false;
 bool low_res_time = false;
@@ -70,10 +70,19 @@ bool first_run = true;
 //Function declaration so that next function can use it.
 void handle_tick(struct tm *tickE, TimeUnits units_changed);
 
-void update_tick_speed(){
-		tick_timer_service_unsubscribe();
-		tick_timer_service_subscribe(HOUR_UNIT|MINUTE_UNIT|SECOND_UNIT, handle_tick);
-
+void update_tick_speed() {
+	//Always need to show hours and minutes
+	TimeUnits important_ticks = HOUR_UNIT|MINUTE_UNIT;
+	if (show_date) {
+		important_ticks |= DAY_UNIT;
+		APP_LOG(APP_LOG_LEVEL_DEBUG, "Tick on the Day");
+	}
+	if (show_seconds) {
+		important_ticks |= SECOND_UNIT;
+		APP_LOG(APP_LOG_LEVEL_DEBUG, "Tick on the second");
+	}
+	tick_timer_service_unsubscribe();
+	tick_timer_service_subscribe(important_ticks, handle_tick);
 	APP_LOG(APP_LOG_LEVEL_DEBUG, "Tick Speed Updated");
 }
 
@@ -84,14 +93,21 @@ void handle_appmessage_receive(DictionaryIterator *iter, void *context) {
 		show_seconds = tuple->value->int32;
 		persist_write_int(MESSAGE_KEY_show_seconds, show_seconds);
 		APP_LOG(APP_LOG_LEVEL_DEBUG, "Saved new show seconds preference (%i).", show_seconds);
-		update_tick_speed();
 	} else if (persist_exists(MESSAGE_KEY_show_seconds)) {
 		show_seconds = persist_read_int(MESSAGE_KEY_show_seconds); 
 		APP_LOG(APP_LOG_LEVEL_DEBUG, "Loaded show seconds preference from watch storage. (%i)", show_seconds);
-		update_tick_speed();
 	} else {
 		show_seconds = true; //Default to true 
 		APP_LOG(APP_LOG_LEVEL_DEBUG, "Loaded default show seconds preference (%i). (No saved settings).", show_seconds);
+	}
+	if (!first_run && show_seconds) {
+		//Delay showing the second hand until it is in the correct location.
+		delayed_show_seconds = true;
+		update_tick_speed();
+		APP_LOG(APP_LOG_LEVEL_DEBUG, "Forcing a Second Update");
+	} else if (!first_run) {
+		layer_set_hidden(second_layer, true);
+		APP_LOG(APP_LOG_LEVEL_DEBUG, "Hide Second Layer");
 	}
 	
 	// Read show date preference
@@ -112,6 +128,7 @@ void handle_appmessage_receive(DictionaryIterator *iter, void *context) {
 		layer_set_hidden(text_layer_get_layer(date_layer), false);
 		layer_set_hidden(text_layer_get_layer(date_layer_shadow), false);
 		APP_LOG(APP_LOG_LEVEL_DEBUG, "Show Date Layers");
+		update_tick_speed();
 		//Update the date now incase it has never been drawn
         draw_date();
 		APP_LOG(APP_LOG_LEVEL_DEBUG, "Forcing a Date Update");
@@ -142,11 +159,9 @@ void handle_appmessage_receive(DictionaryIterator *iter, void *context) {
 		low_res_time = tuple->value->int32;
 		persist_write_int(MESSAGE_KEY_low_res_time, low_res_time);
 		APP_LOG(APP_LOG_LEVEL_DEBUG, "Saved new low resolution time preference (%i).", low_res_time);
-		update_tick_speed();
 	} else if (persist_exists(MESSAGE_KEY_low_res_time)) {
 		low_res_time = persist_read_int(MESSAGE_KEY_low_res_time); 
 		APP_LOG(APP_LOG_LEVEL_DEBUG, "Loaded low resolution time preference from watch storage. (%i)", low_res_time);
-		update_tick_speed();
 	} else {
 		low_res_time = false; //Default to false 
 		APP_LOG(APP_LOG_LEVEL_DEBUG, "Loaded default low resolution time preference (%i). (No saved settings).", low_res_time);
@@ -180,8 +195,9 @@ void handle_appmessage_receive(DictionaryIterator *iter, void *context) {
 		
 		//Force everything to redraw now
 		layer_mark_dirty(window_get_root_layer(window));
+
+		APP_LOG(APP_LOG_LEVEL_DEBUG, "Colors changed");
 	}
-	APP_LOG(APP_LOG_LEVEL_DEBUG, "Colors changed");
 	
 	// Read rotate orb properly preference
 	tuple = dict_find(iter, MESSAGE_KEY_east_to_west_orb_rotation);
@@ -540,7 +556,7 @@ void draw_minute_hand(Layer *layer, GContext *ctx) {
 	minute = t->tm_min;
 	
 
-#if LOW_RES_TIME_OLD || !SHOW_SECONDS_OLD
+#if LOW_RES_TIME_OLD// || !SHOW_SECONDS_OLD
 	//Rotate minute hand to to proper spot (6 degrees per minute)
 	gpath_rotate_to(minute_hand, (TRIG_MAX_ANGLE / 360) * (6*minute));
 #else
@@ -553,7 +569,6 @@ void draw_minute_hand(Layer *layer, GContext *ctx) {
 	gpath_draw_filled(ctx, minute_hand);
 	gpath_draw_outline(ctx, minute_hand);
 }
-#if SHOW_SECONDS_OLD
 void draw_second_hand(Layer *layer, GContext *ctx) {
 	int second;
 
@@ -576,8 +591,8 @@ void draw_second_hand(Layer *layer, GContext *ctx) {
 	
 	gpath_draw_filled(ctx, second_hand_background);
 	gpath_draw_outline(ctx, second_hand_background);
+	
 }
-#endif
 /* handle_tick is called at every time change. It updates 
    things appropriately*/
 void handle_tick(struct tm *tick_time, TimeUnits units_changed) {
@@ -601,7 +616,7 @@ void handle_tick(struct tm *tick_time, TimeUnits units_changed) {
 		layer_mark_dirty(orbiting_body_layer);
 #endif
 	}
-#if LOW_RES_TIME_OLD || !SHOW_SECONDS_OLD
+#if LOW_RES_TIME_OLD// || !SHOW_SECONDS_OLD
 	if (units_changed == 0 || units_changed & MINUTE_UNIT) {
         layer_mark_dirty(minute_layer);
 #if !LOW_RES_TIME_OLD
@@ -616,11 +631,15 @@ void handle_tick(struct tm *tick_time, TimeUnits units_changed) {
   #endif
 	}
 #endif
-#if SHOW_SECONDS_OLD
-  	if (units_changed == 0 || units_changed & SECOND_UNIT) {
+  	if (show_seconds && (units_changed == 0 || units_changed & SECOND_UNIT)) {
+		if(delayed_show_seconds) {
+			layer_set_hidden(second_layer, false);
+			APP_LOG(APP_LOG_LEVEL_DEBUG, "Show Second Layers");
+			delayed_show_seconds = false;
+		}
         layer_mark_dirty(second_layer);
 #if !LOW_RES_TIME_OLD
-		//Only move minute hand every two seconds (due to 10 seconds per degree rotation).
+		//Only move minute hand every ten seconds (due to 10 seconds per degree rotation).
 		if (units_changed == 0 || tick_time->tm_sec%10 == 0) {
         	layer_mark_dirty(minute_layer);
 		}
@@ -634,7 +653,6 @@ void handle_tick(struct tm *tick_time, TimeUnits units_changed) {
 		}
 #endif
 	}
-#endif
 	//Always redraw the hand pin
 	layer_mark_dirty(hand_pin_layer);
 }
@@ -700,8 +718,9 @@ void handle_init() {
 	layer_set_update_proc(orbiting_body_layer, draw_orbiting_body);
 	layer_add_child(watch_face_layer, orbiting_body_layer);
 	layer_set_frame(orbiting_body_layer, GRect(0, 0, 144, 144));
+
 	/* Time (aka Clock Hands) */
-#if SHOW_SECONDS_OLD
+	
 	//Second Hand
 	second_layer = layer_create(layer_get_frame(watch_face_layer));
 	layer_set_update_proc(second_layer, draw_second_hand);
@@ -710,7 +729,9 @@ void handle_init() {
 	gpath_move_to(second_hand_foreground, GPoint(72, 58));
 	second_hand_background = gpath_create(&SECOND_HAND_POINTS_BACKGROUND);
 	gpath_move_to(second_hand_background, GPoint(72, 58));
-#endif
+	if (!show_seconds) {
+		layer_set_hidden(second_layer, true);
+	}
 
 	//Minute Hand
 	minute_layer = layer_create(layer_get_frame(watch_face_layer));
@@ -731,16 +752,12 @@ void handle_init() {
 	layer_set_update_proc(hand_pin_layer, draw_hand_pin);
 	layer_add_child(watch_face_layer, hand_pin_layer);
 	
-	tick_timer_service_subscribe(SECOND_UNIT, handle_tick);
+	update_tick_speed();
 	
 	first_run = false;
 }
 
 void handle_deinit() {
-	//Save config data to local watch storage
-//	persist_write_data(CONFIG_LOCATION, &myconfig, sizeof(myconfig));
-//	APP_LOG(APP_LOG_LEVEL_DEBUG, "Saved Config information to Watch");
-
 	layer_destroy(hand_pin_layer);
 	gpath_destroy(hour_hand);
 	layer_destroy(hour_layer);
