@@ -7,12 +7,14 @@
 
 /*   ------- Config Secion -------     */
 #define SHOW_SECONDS_OLD true
-#define SHOW_DATE_OLD true
 //LOW_RES_TIME_OLD means only updating when needed (better for battery assuming pebble is smart enough to only paint changed pixels)
 #define LOW_RES_TIME_OLD false
 #define INVERTED_OLD false
 #define EAST_TO_WEST_ORB_ROTATION_OLD true //as opposed to clockwise
 /*   ----- End Config Secion -----     */
+
+//Define some functions so that they can be called before they are implemented
+void draw_date();
 	
 GColor BackgroundColor, ForegroundColor;
 	
@@ -59,14 +61,6 @@ double sun_angle = 90.833; //This is the official angle of the sun for sunrise/s
 bool have_gps_fix = false;
 time_t current_time;
 struct tm *t;
-enum ConfigOptions {
-	CONFIG_VERSION,
-	SHOW_SECONDS,
-	SHOW_DATE,
-	LOW_RES_TIME,
-	INVERTED,
-	EAST_TO_WEST_ORB_ROTATION,
-};
 bool show_seconds = true;
 bool show_date = true;
 bool show_ring = false;
@@ -78,15 +72,11 @@ bool first_run = true;
 //Function declaration so that next function can use it.
 void handle_tick(struct tm *tickE, TimeUnits units_changed);
 
-void update_screen(){
+void update_tick_speed(){
 		tick_timer_service_unsubscribe();
 		tick_timer_service_subscribe(HOUR_UNIT|MINUTE_UNIT|SECOND_UNIT, handle_tick);
-	
-	if (first_run) {
-		first_run = false;
-	}
 
-	APP_LOG(APP_LOG_LEVEL_DEBUG, "Set Watch Style");
+	APP_LOG(APP_LOG_LEVEL_DEBUG, "Tick Speed Updated");
 }
 
 void handle_appmessage_receive(DictionaryIterator *iter, void *context) {
@@ -96,11 +86,11 @@ void handle_appmessage_receive(DictionaryIterator *iter, void *context) {
 		show_seconds = tuple->value->int32;
 		persist_write_int(MESSAGE_KEY_show_seconds, show_seconds);
 		APP_LOG(APP_LOG_LEVEL_DEBUG, "Saved new show seconds preference (%i).", show_seconds);
-		update_screen();
+		update_tick_speed();
 	} else if (persist_exists(MESSAGE_KEY_show_seconds)) {
 		show_seconds = persist_read_int(MESSAGE_KEY_show_seconds); 
 		APP_LOG(APP_LOG_LEVEL_DEBUG, "Loaded show seconds preference from watch storage. (%i)", show_seconds);
-		update_screen();
+		update_tick_speed();
 	} else {
 		show_seconds = true; //Default to true 
 		APP_LOG(APP_LOG_LEVEL_DEBUG, "Loaded default show seconds preference (%i). (No saved settings).", show_seconds);
@@ -112,14 +102,26 @@ void handle_appmessage_receive(DictionaryIterator *iter, void *context) {
 		show_date = tuple->value->int32;
 		persist_write_int(MESSAGE_KEY_show_date, show_date);
 		APP_LOG(APP_LOG_LEVEL_DEBUG, "Saved new show date preference (%i).", show_date);
-		update_screen();
 	} else if (persist_exists(MESSAGE_KEY_show_date)) {
-		show_seconds = persist_read_int(MESSAGE_KEY_show_date); 
+		show_date = persist_read_int(MESSAGE_KEY_show_date); 
 		APP_LOG(APP_LOG_LEVEL_DEBUG, "Loaded show date preference from watch storage. (%i)", show_date);
-		update_screen();
 	} else {
 		show_date = true; //Default to true 
 		APP_LOG(APP_LOG_LEVEL_DEBUG, "Loaded default show date preference (%i). (No saved settings).", show_date);
+	}
+	//Set Date Display Options
+	if (!first_run && show_date) {
+		layer_set_hidden(text_layer_get_layer(date_layer), false);
+		layer_set_hidden(text_layer_get_layer(date_layer_shadow), false);
+		APP_LOG(APP_LOG_LEVEL_DEBUG, "Show Date Layers");
+		//Update the date now incase it has never been drawn
+        draw_date();
+		APP_LOG(APP_LOG_LEVEL_DEBUG, "Forcing a Date Update");
+
+	} else if (!first_run) {
+		layer_set_hidden(text_layer_get_layer(date_layer), true);
+		layer_set_hidden(text_layer_get_layer(date_layer_shadow), true);
+		APP_LOG(APP_LOG_LEVEL_DEBUG, "Hide Date Layers");
 	}
 	
 	// Read show ring preference
@@ -128,11 +130,11 @@ void handle_appmessage_receive(DictionaryIterator *iter, void *context) {
 		show_ring = tuple->value->int32;
 		persist_write_int(MESSAGE_KEY_show_ring, show_ring);
 		APP_LOG(APP_LOG_LEVEL_DEBUG, "Saved new show ring preference (%i).", show_ring);
-		update_screen();
+		update_tick_speed();
 	} else if (persist_exists(MESSAGE_KEY_show_ring)) {
 		show_ring = persist_read_int(MESSAGE_KEY_show_ring); 
 		APP_LOG(APP_LOG_LEVEL_DEBUG, "Loaded show ring preference from watch storage. (%i)", show_ring);
-		update_screen();
+		update_tick_speed();
 	} else {
 		show_ring = false; //Default to false 
 		APP_LOG(APP_LOG_LEVEL_DEBUG, "Loaded default show false preference (%i). (No saved settings).", show_ring);
@@ -144,11 +146,11 @@ void handle_appmessage_receive(DictionaryIterator *iter, void *context) {
 		low_res_time = tuple->value->int32;
 		persist_write_int(MESSAGE_KEY_low_res_time, low_res_time);
 		APP_LOG(APP_LOG_LEVEL_DEBUG, "Saved new low resolution time preference (%i).", low_res_time);
-		update_screen();
+		update_tick_speed();
 	} else if (persist_exists(MESSAGE_KEY_low_res_time)) {
 		low_res_time = persist_read_int(MESSAGE_KEY_low_res_time); 
 		APP_LOG(APP_LOG_LEVEL_DEBUG, "Loaded low resolution time preference from watch storage. (%i)", low_res_time);
-		update_screen();
+		update_tick_speed();
 	} else {
 		low_res_time = false; //Default to false 
 		APP_LOG(APP_LOG_LEVEL_DEBUG, "Loaded default low resolution time preference (%i). (No saved settings).", low_res_time);
@@ -160,11 +162,11 @@ void handle_appmessage_receive(DictionaryIterator *iter, void *context) {
 		inverted = tuple->value->int32;
 		persist_write_int(MESSAGE_KEY_inverted, inverted);
 		APP_LOG(APP_LOG_LEVEL_DEBUG, "Saved new inverted colors preference (%i).", inverted);
-		update_screen();
+		update_tick_speed();
 	} else if (persist_exists(MESSAGE_KEY_inverted)) {
 		inverted = persist_read_int(MESSAGE_KEY_inverted); 
 		APP_LOG(APP_LOG_LEVEL_DEBUG, "Loaded use inverted colors preference from watch storage. (%i)", inverted);
-		update_screen();
+		update_tick_speed();
 	} else {
 		inverted = true; //Default to true 
 		APP_LOG(APP_LOG_LEVEL_DEBUG, "Loaded default use inverted colors preference (%i). (No saved settings).", inverted);
@@ -176,11 +178,11 @@ void handle_appmessage_receive(DictionaryIterator *iter, void *context) {
 		east_to_west_orb_rotation = tuple->value->int32;
 		persist_write_int(MESSAGE_KEY_east_to_west_orb_rotation, east_to_west_orb_rotation);
 		APP_LOG(APP_LOG_LEVEL_DEBUG, "Saved new east to west orb rotation preference (%i).", east_to_west_orb_rotation);
-		update_screen();
+		update_tick_speed();
 	} else if (persist_exists(MESSAGE_KEY_east_to_west_orb_rotation)) {
 		east_to_west_orb_rotation = persist_read_int(MESSAGE_KEY_east_to_west_orb_rotation); 
 		APP_LOG(APP_LOG_LEVEL_DEBUG, "Loaded east to west orb rotation preference from watch storage. (%i)", east_to_west_orb_rotation);
-		update_screen();
+		update_tick_speed();
 	} else {
 		east_to_west_orb_rotation = true; //Default to true 
 		APP_LOG(APP_LOG_LEVEL_DEBUG, "Loaded east to west orb rotation preference (%i). (No saved settings).", east_to_west_orb_rotation);
@@ -435,7 +437,6 @@ void draw_watch_face(Layer *layer, GContext *ctx) {
 		}
 	}
 }
-#if SHOW_DATE_OLD
 void draw_date() {
 	
 	static char dom_text[] = "00";
@@ -444,7 +445,6 @@ void draw_date() {
 	text_layer_set_text(date_layer, dom_text);
 	text_layer_set_text(date_layer_shadow, dom_text);
 }
-#endif
 void draw_orbiting_body(Layer *layer, GContext *ctx) {
 	int hour, angle;
 
@@ -576,11 +576,9 @@ void handle_tick(struct tm *tick_time, TimeUnits units_changed) {
 	
 	//NOTE: This is a Bit Mask Check not a and &&
 	//Secondary Note: units_changed == 0 catches initialzation tick
-#if SHOW_DATE_OLD
-	if (units_changed == 0 || units_changed & DAY_UNIT) {
+	if (show_date && (units_changed == 0 || units_changed & DAY_UNIT)) {
         draw_date();
 	}
-#endif
 	
   	if (units_changed == 0 || units_changed & HOUR_UNIT) {
 		//http_time_request(); //Update Sunrise/set location & data
@@ -676,7 +674,6 @@ void handle_init() {
 	text_layer_set_background_color(sundown_layer, GColorClear);
 	layer_add_child(window_get_root_layer(window), text_layer_get_layer(sundown_layer));
 
-#if SHOW_DATE_OLD
 	/* Date */
 	date_layer = text_layer_create(GRect((int)(144/2 - 15), (int)(144/2 + 20), 30, 30));
 	text_layer_set_font(date_layer, fonts_get_system_font(FONT_KEY_GOTHIC_24_BOLD));
@@ -690,8 +687,9 @@ void handle_init() {
 	text_layer_set_text_color(date_layer_shadow, ForegroundColor);
 	text_layer_set_background_color(date_layer_shadow, GColorClear);
 	layer_add_child(watch_face_layer, text_layer_get_layer(date_layer_shadow));
-	draw_date();
-#endif
+	if (show_date) {
+		draw_date();
+	}
 	
 	/* Orbiting Body (aka 24 hour analog clock) */
 	orbiting_body_layer = layer_create(layer_get_frame(watch_face_layer));
@@ -730,6 +728,8 @@ void handle_init() {
 	layer_add_child(watch_face_layer, hand_pin_layer);
 	
 	tick_timer_service_subscribe(SECOND_UNIT, handle_tick);
+	
+	first_run = false;
 }
 
 void handle_deinit() {
