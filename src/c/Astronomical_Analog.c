@@ -9,7 +9,6 @@
 #define SHOW_SECONDS_OLD true
 //LOW_RES_TIME_OLD means only updating when needed (better for battery assuming pebble is smart enough to only paint changed pixels)
 #define LOW_RES_TIME_OLD false
-#define EAST_TO_WEST_ORB_ROTATION_OLD true //as opposed to clockwise
 /*   ----- End Config Secion -----     */
 
 //Define some functions so that they can be called before they are implemented
@@ -129,11 +128,9 @@ void handle_appmessage_receive(DictionaryIterator *iter, void *context) {
 		show_ring = tuple->value->int32;
 		persist_write_int(MESSAGE_KEY_show_ring, show_ring);
 		APP_LOG(APP_LOG_LEVEL_DEBUG, "Saved new show ring preference (%i).", show_ring);
-		update_tick_speed();
 	} else if (persist_exists(MESSAGE_KEY_show_ring)) {
 		show_ring = persist_read_int(MESSAGE_KEY_show_ring); 
 		APP_LOG(APP_LOG_LEVEL_DEBUG, "Loaded show ring preference from watch storage. (%i)", show_ring);
-		update_tick_speed();
 	} else {
 		show_ring = false; //Default to false 
 		APP_LOG(APP_LOG_LEVEL_DEBUG, "Loaded default show false preference (%i). (No saved settings).", show_ring);
@@ -165,7 +162,7 @@ void handle_appmessage_receive(DictionaryIterator *iter, void *context) {
 		inverted = persist_read_int(MESSAGE_KEY_inverted); 
 		APP_LOG(APP_LOG_LEVEL_DEBUG, "Loaded use inverted colors preference from watch storage. (%i)", inverted);
 	} else {
-		inverted = true; //Default to true 
+		inverted = false; //Default to true 
 		APP_LOG(APP_LOG_LEVEL_DEBUG, "Loaded default use inverted colors preference (%i). (No saved settings).", inverted);
 	}
 	if(!inverted) {
@@ -192,14 +189,15 @@ void handle_appmessage_receive(DictionaryIterator *iter, void *context) {
 		east_to_west_orb_rotation = tuple->value->int32;
 		persist_write_int(MESSAGE_KEY_east_to_west_orb_rotation, east_to_west_orb_rotation);
 		APP_LOG(APP_LOG_LEVEL_DEBUG, "Saved new east to west orb rotation preference (%i).", east_to_west_orb_rotation);
-		update_tick_speed();
 	} else if (persist_exists(MESSAGE_KEY_east_to_west_orb_rotation)) {
 		east_to_west_orb_rotation = persist_read_int(MESSAGE_KEY_east_to_west_orb_rotation); 
 		APP_LOG(APP_LOG_LEVEL_DEBUG, "Loaded east to west orb rotation preference from watch storage. (%i)", east_to_west_orb_rotation);
-		update_tick_speed();
 	} else {
 		east_to_west_orb_rotation = true; //Default to true 
 		APP_LOG(APP_LOG_LEVEL_DEBUG, "Loaded east to west orb rotation preference (%i). (No saved settings).", east_to_west_orb_rotation);
+	}
+	if (!first_run) {
+		layer_mark_dirty(orbiting_body_layer);
 	}
 	APP_LOG(APP_LOG_LEVEL_DEBUG, "Completed processing config data");
 }
@@ -295,11 +293,11 @@ int next_rectangle_corner(GRect rect, GPoint point) {
 	else if (point.y == rect.size.h/2) {
 		corner = 2;
 	}
-#if EAST_TO_WEST_ORB_ROTATION_OLD
-	if (corner == 1 || corner == 3) {
-		corner = (corner + 2)%4;
+	if (east_to_west_orb_rotation) {
+		if (corner == 1 || corner == 3) {
+			corner = (corner + 2)%4;
+		}
 	}
-#endif
 	return corner;
 }
 
@@ -329,11 +327,11 @@ void draw_night_path(GRect rect, GContext *ctx) {
 
 		GPathInfo corner_points = {
 			.num_points = 4,
-#if EAST_TO_WEST_ORB_ROTATION_OLD
-			.points = (GPoint []) {{-rect.size.w/2, -rect.size.h/2}, {-rect.size.w/2, rect.size.h/2}, {rect.size.w/2, rect.size.h/2}, {rect.size.w/2, -rect.size.h/2}}
-#else
-			.points = (GPoint []) {{rect.size.w/2, -rect.size.h/2}, {rect.size.w/2, rect.size.h/2}, {-rect.size.w/2, rect.size.h/2}, {-rect.size.w/2, -rect.size.h/2}}
-#endif
+			.points = (east_to_west_orb_rotation?
+					   	(GPoint []) {{-rect.size.w/2, -rect.size.h/2}, {-rect.size.w/2, rect.size.h/2}, {rect.size.w/2, rect.size.h/2}, {rect.size.w/2, -rect.size.h/2}}
+					  :
+						(GPoint []) {{rect.size.w/2, -rect.size.h/2}, {rect.size.w/2, rect.size.h/2}, {-rect.size.w/2, rect.size.h/2}, {-rect.size.w/2, -rect.size.h/2}}
+					  )
 		};
 
 		//Calculate sunrise/sunset
@@ -346,13 +344,13 @@ void draw_night_path(GRect rect, GContext *ctx) {
 		angle_sunup = (15*((suntimes.sunup->tm_hour + 12)%24)) + (suntimes.sunup->tm_min/4);
 		angle_sundown = (15*((suntimes.sundown->tm_hour + 12)%24)) + (suntimes.sundown->tm_min/4);
 	
-#if EAST_TO_WEST_ORB_ROTATION_OLD
-        angle_sunup = (360 - angle_sunup);
-        angle_sundown = (360 - angle_sundown);
-		angle_diff = angle_sundown - angle_sunup;
-#else
-		angle_diff = angle_sunup - angle_sundown;
-#endif	
+		if (east_to_west_orb_rotation) {
+			angle_sunup = (360 - angle_sunup);
+			angle_sundown = (360 - angle_sundown);
+			angle_diff = angle_sundown - angle_sunup;
+		} else {
+			angle_diff = angle_sunup - angle_sundown;
+		}
 	
 		if (angle_diff < 0) { angle_diff += 360; }
 		if (angle_diff > 360) { angle_diff = angle_diff%360; }
@@ -488,9 +486,9 @@ void draw_orbiting_body(Layer *layer, GContext *ctx) {
 	//Rotate orbiting body to proper spot (15 degrees per hour + 1 degree per 4 minutes)
 	angle = (15*hour) + (minute/4);
 #endif
-#if EAST_TO_WEST_ORB_ROTATION_OLD
+	if (east_to_west_orb_rotation) {
         angle = -(angle - 360);
-#endif	
+	}	
 	graphics_fill_circle(ctx, move_by_degrees(center_point, layer_radius - body_radius - 10, angle), body_radius);
 	graphics_draw_circle(ctx, move_by_degrees(center_point, layer_radius - body_radius - 10, angle), body_radius);
 
@@ -657,24 +655,24 @@ void handle_init() {
 	watch_face_layer = layer_create(GRect(0, 14, 144, 144));
 	layer_set_update_proc(watch_face_layer, draw_watch_face);
 	layer_add_child(window_get_root_layer(window), watch_face_layer);
-#if EAST_TO_WEST_ORB_ROTATION_OLD
-	sunup_layer = text_layer_create(GRect((int)(144 - 44), (int)(144), 40, 30));
-	text_layer_set_text_alignment(sunup_layer, GTextAlignmentRight);
-#else
-	sunup_layer = text_layer_create(GRect((int)(4), (int)(144), 40, 30));
-	text_layer_set_text_alignment(sunup_layer, GTextAlignmentLeft);
-#endif
+	if (east_to_west_orb_rotation) {
+		sunup_layer = text_layer_create(GRect((int)(144 - 44), (int)(144), 40, 30));
+		text_layer_set_text_alignment(sunup_layer, GTextAlignmentRight);
+	} else {
+		sunup_layer = text_layer_create(GRect((int)(4), (int)(144), 40, 30));
+		text_layer_set_text_alignment(sunup_layer, GTextAlignmentLeft);
+	}
 	text_layer_set_font(sunup_layer, fonts_get_system_font(FONT_KEY_GOTHIC_18));
 	text_layer_set_text_color(sunup_layer, ForegroundColor);
 	text_layer_set_background_color(sunup_layer, GColorClear);
 	layer_add_child(window_get_root_layer(window), text_layer_get_layer(sunup_layer));
-#if EAST_TO_WEST_ORB_ROTATION_OLD
-	sundown_layer = text_layer_create(GRect((int)(4), (int)(144), 40, 30));
-	text_layer_set_text_alignment(sundown_layer, GTextAlignmentLeft);
-#else
-	sundown_layer = text_layer_create(GRect((int)(144 - 44), (int)(144), 40, 30));
-	text_layer_set_text_alignment(sundown_layer, GTextAlignmentRight);
-#endif
+	if (east_to_west_orb_rotation) {
+		sundown_layer = text_layer_create(GRect((int)(4), (int)(144), 40, 30));
+		text_layer_set_text_alignment(sundown_layer, GTextAlignmentLeft);
+	} else {
+		sundown_layer = text_layer_create(GRect((int)(144 - 44), (int)(144), 40, 30));
+		text_layer_set_text_alignment(sundown_layer, GTextAlignmentRight);
+	}
 	text_layer_set_font(sundown_layer, fonts_get_system_font(FONT_KEY_GOTHIC_18));
 	text_layer_set_text_color(sundown_layer, ForegroundColor);
 	text_layer_set_background_color(sundown_layer, GColorClear);
