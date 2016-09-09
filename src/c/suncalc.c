@@ -10,7 +10,7 @@
  *	Please note that calculations in the spreadsheets are only valid for dates between 1901 and 2099, 
  *	 due to an approximation used in the Julian Day calculation."
  */
-#include "pebble_os.h"
+#include <pebble.h>
 #include "my_math.h"
 #include <math.h>
 #include "suncalc.h"
@@ -25,19 +25,19 @@ double degrees(double radians)
     return (180.0/M_PI)*radians;
 }
 
-PblTm excel_to_pebble_time(double excel_time)
+struct tm * excel_to_pebble_time(double excel_time)
 {
-	PblTm time;
+	time_t current_time = time(NULL);
+  	struct tm *t = localtime(&current_time);  //Assume current date for time
 	int seconds_time;
-	get_time(&time);	//Assume current date for time
 	excel_time = excel_time - (int)excel_time; //Remove date portion if there is one
 
 	seconds_time = excel_time*24*60*60;
-	time.tm_hour = seconds_time/(60*60);	//Hours since midnight.
-	time.tm_min = (seconds_time/60)%60;		//Minutes after the hour.
-	time.tm_sec = seconds_time%(60);		//Seconds after the minute.
+	t->tm_hour = seconds_time/(60*60);	//Hours since midnight.
+	t->tm_min = (seconds_time/60)%60;		//Minutes after the hour.
+	t->tm_sec = seconds_time%(60);		//Seconds after the minute.
 	
-	return time;
+	return t;
 }
 
 double ha_sunrise_deg_calc(double angle, float lat, double sun_declin_deg) 
@@ -46,21 +46,21 @@ double ha_sunrise_deg_calc(double angle, float lat, double sun_declin_deg)
 }
 
 //angle = 90.833 for sunrise & sunset
-times my_suntimes(float lat, float lon, PblTm time, float timezone, double angle) {
+times my_suntimes(float lat, float lon, struct tm *time, float timezone, double angle) {
 	times return_times;
     double julian_day, julian_century, geom_mean_long_sun_deg, geom_mean_anom_sun_deg, eccent_earth_orbit;
 	double sun_eq_of_ctr, sun_true_long_deg, sun_app_long_deg, mean_obliq_ecliptic_deg, obliq_corr_deg;
 	double y, eq_of_time_minutes, ha_sunrise_deg, solar_noon_LST, sunrise_time_LST, sunset_time_LST;
 
 	//Julian date formula from http://en.wikipedia.org/wiki/Julian_day
-	int year = time.tm_year + 1900;
-	int a = (14 - time.tm_mon)/12; //1 for Jan and Feb, 0 for all other months
+	int year = time->tm_year + 1900;
+	int a = (14 - time->tm_mon)/12; //1 for Jan and Feb, 0 for all other months
         year = year + 4800 - a;
-	int month = (time.tm_mon + 1) + (12*a) - 3; //0 for Mar, 11 for Feb
+	int month = (time->tm_mon + 1) + (12*a) - 3; //0 for Mar, 11 for Feb
 	//Day portion
-	julian_day = time.tm_mday + (((153*month) + 2)/5) + (365*year) + (year/4) - (year/100) + (year/400) - 32045;
+	julian_day = time->tm_mday + (((153*month) + 2)/5) + (365*year) + (year/4) - (year/100) + (year/400) - 32045;
 	//Time portion
-	julian_day += ((time.tm_hour - timezone -12)/24.0) + (time.tm_min/1440.0) + (time.tm_sec/86400.0);
+	julian_day += ((time->tm_hour - timezone -12)/24.0) + (time->tm_min/1440.0) + (time->tm_sec/86400.0);
 
 	julian_century = (julian_day-2451545.0)/36525.0;
 
