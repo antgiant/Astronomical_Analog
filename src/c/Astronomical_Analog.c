@@ -9,7 +9,6 @@
 #define SHOW_SECONDS_OLD true
 //LOW_RES_TIME_OLD means only updating when needed (better for battery assuming pebble is smart enough to only paint changed pixels)
 #define LOW_RES_TIME_OLD false
-#define INVERTED_OLD false
 #define EAST_TO_WEST_ORB_ROTATION_OLD true //as opposed to clockwise
 /*   ----- End Config Secion -----     */
 
@@ -162,15 +161,30 @@ void handle_appmessage_receive(DictionaryIterator *iter, void *context) {
 		inverted = tuple->value->int32;
 		persist_write_int(MESSAGE_KEY_inverted, inverted);
 		APP_LOG(APP_LOG_LEVEL_DEBUG, "Saved new inverted colors preference (%i).", inverted);
-		update_tick_speed();
 	} else if (persist_exists(MESSAGE_KEY_inverted)) {
 		inverted = persist_read_int(MESSAGE_KEY_inverted); 
 		APP_LOG(APP_LOG_LEVEL_DEBUG, "Loaded use inverted colors preference from watch storage. (%i)", inverted);
-		update_tick_speed();
 	} else {
 		inverted = true; //Default to true 
 		APP_LOG(APP_LOG_LEVEL_DEBUG, "Loaded default use inverted colors preference (%i). (No saved settings).", inverted);
 	}
+	if(!inverted) {
+		BackgroundColor = GColorBlack;
+		ForegroundColor = GColorWhite;
+	} else {
+		BackgroundColor = GColorWhite;
+		ForegroundColor = GColorBlack;
+	}
+	if (!first_run) { //Don't mark a layer dirty that doesn't exist yet.
+		//Manually update colors
+	    window_set_background_color(window, BackgroundColor);
+		text_layer_set_text_color(date_layer, BackgroundColor);
+		text_layer_set_text_color(date_layer_shadow, ForegroundColor);
+		
+		//Force everything to redraw now
+		layer_mark_dirty(window_get_root_layer(window));
+	}
+	APP_LOG(APP_LOG_LEVEL_DEBUG, "Colors changed");
 	
 	// Read rotate orb properly preference
 	tuple = dict_find(iter, MESSAGE_KEY_east_to_west_orb_rotation);
@@ -628,14 +642,6 @@ void handle_tick(struct tm *tick_time, TimeUnits units_changed) {
 }
 
 void handle_init() {
-#if !INVERTED_OLD
-	BackgroundColor = GColorBlack;
-	ForegroundColor = GColorWhite;
-#else
-	BackgroundColor = GColorWhite;
-	ForegroundColor = GColorBlack;
-#endif
-
 	load_saved_config_options();
 	app_message_register_inbox_received(&handle_appmessage_receive);
 	app_message_open(INBOX_SIZE, OUTBOX_SIZE);
