@@ -5,11 +5,6 @@
 #define INBOX_SIZE  (1 + (7+4) * 6)
 #define OUTBOX_SIZE (1 + (7+4) * 6)
 
-/*   ------- Config Secion -------     */
-//LOW_RES_TIME_OLD means only updating when needed (better for battery assuming pebble is smart enough to only paint changed pixels)
-#define LOW_RES_TIME_OLD false
-/*   ----- End Config Secion -----     */
-
 //Define some functions so that they can be called before they are implemented
 void draw_date();
 	
@@ -493,15 +488,15 @@ void draw_orbiting_body(Layer *layer, GContext *ctx) {
 	//Draw Orbiting Body
 	body_radius = 7;
 	
-#if LOW_RES_TIME_OLD
-	//Rotate orbiting body to proper spot (15 degrees per hour)
-	angle = (15*hour);
-#else
-	int minute;
-	minute = t->tm_min;
-	//Rotate orbiting body to proper spot (15 degrees per hour + 1 degree per 4 minutes)
-	angle = (15*hour) + (minute/4);
-#endif
+	if (low_res_time) {
+		//Rotate orbiting body to proper spot (15 degrees per hour)
+		angle = (15*hour);
+	} else {
+		int minute;
+		minute = t->tm_min;
+		//Rotate orbiting body to proper spot (15 degrees per hour + 1 degree per 4 minutes)
+		angle = (15*hour) + (minute/4);
+	}
 	if (east_to_west_orb_rotation) {
         angle = -(angle - 360);
 	}	
@@ -533,15 +528,15 @@ void draw_hour_hand(Layer *layer, GContext *ctx) {
 
 	hour = t->tm_hour%12;
 
-#if LOW_RES_TIME_OLD
-	//Rotate hour hand to to proper spot (30 degrees per hour)
-	gpath_rotate_to(hour_hand, (TRIG_MAX_ANGLE / 360) * (30*hour));
-#else
-	int minute;
-	minute = t->tm_min;
-	//Rotate hour hand to to proper spot (30 degrees per hour + 1 degree per 2 minutes)
-	gpath_rotate_to(hour_hand, (TRIG_MAX_ANGLE / 360) * ((30*hour) + (minute/2)));
-#endif
+	if (low_res_time) {
+		//Rotate hour hand to to proper spot (30 degrees per hour)
+		gpath_rotate_to(hour_hand, (TRIG_MAX_ANGLE / 360) * (30*hour));
+	} else {
+		int minute;
+		minute = t->tm_min;
+		//Rotate hour hand to to proper spot (30 degrees per hour + 1 degree per 2 minutes)
+		gpath_rotate_to(hour_hand, (TRIG_MAX_ANGLE / 360) * ((30*hour) + (minute/2)));
+	}
 	
 	gpath_draw_filled(ctx, hour_hand);
 	gpath_draw_outline(ctx, hour_hand);
@@ -556,15 +551,15 @@ void draw_minute_hand(Layer *layer, GContext *ctx) {
 	minute = t->tm_min;
 	
 
-#if LOW_RES_TIME_OLD// || !SHOW_SECONDS_OLD
-	//Rotate minute hand to to proper spot (6 degrees per minute)
-	gpath_rotate_to(minute_hand, (TRIG_MAX_ANGLE / 360) * (6*minute));
-#else
-	int second;
-	second = t->tm_sec;
-	//Rotate minute hand to to proper spot (6 degrees per minute + 1 degree per 10 seconds)
-	gpath_rotate_to(minute_hand, (TRIG_MAX_ANGLE / 360) * ((6*minute) + (second/10)));
-#endif
+	if (low_res_time || !show_seconds) {
+		//Rotate minute hand to to proper spot (6 degrees per minute)
+		gpath_rotate_to(minute_hand, (TRIG_MAX_ANGLE / 360) * (6*minute));
+	} else {
+		int second;
+		second = t->tm_sec;
+		//Rotate minute hand to to proper spot (6 degrees per minute + 1 degree per 10 seconds)
+		gpath_rotate_to(minute_hand, (TRIG_MAX_ANGLE / 360) * ((6*minute) + (second/10)));
+	}
 	
 	gpath_draw_filled(ctx, minute_hand);
 	gpath_draw_outline(ctx, minute_hand);
@@ -610,27 +605,27 @@ void handle_tick(struct tm *tick_time, TimeUnits units_changed) {
   	if (units_changed == 0 || units_changed & HOUR_UNIT) {
 		//http_time_request(); //Update Sunrise/set location & data
 
-//No need to seperatly update hour hand if done by another hand
-#if LOW_RES_TIME_OLD
-        layer_mark_dirty(hour_layer);
-		layer_mark_dirty(orbiting_body_layer);
-#endif
+		//No need to seperatly update hour hand if done by another hand
+		if(low_res_time) {
+			layer_mark_dirty(hour_layer);
+			layer_mark_dirty(orbiting_body_layer);
+		}
 	}
-#if LOW_RES_TIME_OLD// || !SHOW_SECONDS_OLD
-	if (units_changed == 0 || units_changed & MINUTE_UNIT) {
-        layer_mark_dirty(minute_layer);
-#if !LOW_RES_TIME_OLD
-		//Only move hour hand every two minutes (due to 2 minutes per degree rotation).
-		if (units_changed == 0 || tick_time->tm_min%2 == 0) {
-        	layer_mark_dirty(hour_layer);
-	  		//Only move orb every 4 minutes (due to 4 minutes per degree rotation)
-			if (tick_time->tm_min%4 == 0) {
-				layer_mark_dirty(orbiting_body_layer);
+	if(low_res_time || !show_seconds) {
+		if (units_changed == 0 || units_changed & MINUTE_UNIT) {
+			layer_mark_dirty(minute_layer);
+			if(!low_res_time) {
+				//Only move hour hand every two minutes (due to 2 minutes per degree rotation).
+				if (units_changed == 0 || tick_time->tm_min%2 == 0) {
+					layer_mark_dirty(hour_layer);
+					//Only move orb every 4 minutes (due to 4 minutes per degree rotation)
+					if (tick_time->tm_min%4 == 0) {
+						layer_mark_dirty(orbiting_body_layer);
+					}
+				}
 			}
 		}
-  #endif
 	}
-#endif
   	if (show_seconds && (units_changed == 0 || units_changed & SECOND_UNIT)) {
 		if(delayed_show_seconds) {
 			layer_set_hidden(second_layer, false);
@@ -638,20 +633,20 @@ void handle_tick(struct tm *tick_time, TimeUnits units_changed) {
 			delayed_show_seconds = false;
 		}
         layer_mark_dirty(second_layer);
-#if !LOW_RES_TIME_OLD
-		//Only move minute hand every ten seconds (due to 10 seconds per degree rotation).
-		if (units_changed == 0 || tick_time->tm_sec%10 == 0) {
-        	layer_mark_dirty(minute_layer);
-		}
-	  	//Only move hour hand every two minutes (due to 2 minutes per degree rotation).
-		if (units_changed == 0 || tick_time->tm_min%2 == 0) {
-        	layer_mark_dirty(hour_layer);
-	  		//Only move orb every 4 minutes (due to 4 minutes per degree rotation)
-			if (tick_time->tm_min%4 == 0) {
-				layer_mark_dirty(orbiting_body_layer);
+		if (!low_res_time) {
+			//Only move minute hand every ten seconds (due to 10 seconds per degree rotation).
+			if (units_changed == 0 || tick_time->tm_sec%10 == 0) {
+				layer_mark_dirty(minute_layer);
+			}
+			//Only move hour hand every two minutes (due to 2 minutes per degree rotation).
+			if (units_changed == 0 || tick_time->tm_min%2 == 0) {
+				layer_mark_dirty(hour_layer);
+				//Only move orb every 4 minutes (due to 4 minutes per degree rotation)
+				if (tick_time->tm_min%4 == 0) {
+					layer_mark_dirty(orbiting_body_layer);
+				}
 			}
 		}
-#endif
 	}
 	//Always redraw the hand pin
 	layer_mark_dirty(hand_pin_layer);
