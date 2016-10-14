@@ -2,8 +2,8 @@
 #include "suncalc.h"
 
 //Last number is the max # of integers to be passed
-#define INBOX_SIZE  (1 + (7+4) * 6)
-#define OUTBOX_SIZE (1 + (7+4) * 6)
+#define INBOX_SIZE  (1 + (7+4) * 8)
+#define OUTBOX_SIZE (1 + (7+4) * 8)
 
 //Define some functions so that they can be called before they are implemented
 void draw_date();
@@ -48,7 +48,7 @@ GPath *second_hand_foreground;
 GPath *second_hand_background;
 GPath *night_pattern;
 times suntimes;
-float latitude, longitude, timezone;
+float latitude, longitude;
 double sun_angle = 90.833; //This is the official angle of the sun for sunrise/sunset
 bool have_gps_fix = false;
 time_t current_time;
@@ -210,6 +210,34 @@ void handle_appmessage_receive(DictionaryIterator *iter, void *context) {
 	if (!first_run) {
 		layer_mark_dirty(orbiting_body_layer);
 	}
+	
+	// Read rotate orb properly preference
+	tuple = dict_find(iter, MESSAGE_KEY_latitude);
+	Tuple *tuple2 = dict_find(iter, MESSAGE_KEY_longitude);
+	int temp_lat, temp_long;
+	if(tuple && tuple2) {
+		temp_lat = tuple->value->int32;
+		temp_long = tuple2->value->int32;
+		latitude = temp_lat/10000.0;
+		longitude = temp_long/10000.0;
+		persist_write_int(MESSAGE_KEY_latitude, temp_lat);
+		persist_write_int(MESSAGE_KEY_longitude, temp_long);
+//		have_gps_fix = true;
+		//Mark sunrise/set layer in need of updating.
+		layer_mark_dirty(watch_face_layer);
+		APP_LOG(APP_LOG_LEVEL_DEBUG, "Saved new GPS coordinates (%i, %i).", temp_lat, temp_long);
+	} else if (persist_exists(MESSAGE_KEY_latitude) && persist_exists(MESSAGE_KEY_longitude)) {
+		temp_lat = persist_read_int(MESSAGE_KEY_latitude);
+		temp_long = persist_read_int(MESSAGE_KEY_longitude);
+		latitude = temp_lat/10000.0; 
+		longitude = temp_long/10000.0; 
+//  		have_gps_fix = true;
+		APP_LOG(APP_LOG_LEVEL_DEBUG, "Loaded GPS coordinates (%i, %i) from watch memory.", temp_lat, temp_long);
+	}
+	if (!first_run) {
+		layer_mark_dirty(orbiting_body_layer);
+	}
+	
 	APP_LOG(APP_LOG_LEVEL_DEBUG, "Completed processing config data");
 }
 
@@ -312,28 +340,6 @@ int next_rectangle_corner(GRect rect, GPoint point) {
 	return corner;
 }
 
-//Called if Httpebble is installed on phone.
-void have_time(int32_t dst_offset, bool is_dst, uint32_t unixtime, const char* tz_name, void* context) {
-  if (!is_dst) {
-    timezone = dst_offset/3600.0;
-  }
-  else {
-    timezone = (dst_offset/3600.0) - 1;
-  }
- 
-  //Now that we have timezone get location
-  //http_location_request();	
-}
-
-//Called if Httpebble is installed on phone.
-void have_location(float lat, float lon, float altitude, float accuracy, void* context) {
-	latitude = lat;
-	longitude = lon;  
-  	have_gps_fix = true;
-  //Mark sunrise/set layer in need of updating.
-  layer_mark_dirty(watch_face_layer);
-}
-
 void draw_night_path(GRect rect, GContext *ctx) {
 
 		GPathInfo corner_points = {
@@ -345,8 +351,12 @@ void draw_night_path(GRect rect, GContext *ctx) {
 					  )
 		};
 
+		APP_LOG(APP_LOG_LEVEL_DEBUG, "Problem Hunting");
 		//Calculate sunrise/sunset
+		float timezone = (t->tm_gmtoff + ((t->tm_isdst > 0) ? 3600 : 0))/3600.0;
+		APP_LOG(APP_LOG_LEVEL_DEBUG, "Special Problem Hunting");
         suntimes = my_suntimes(latitude, longitude, t, timezone, sun_angle);
+		APP_LOG(APP_LOG_LEVEL_DEBUG, "More Problem Hunting");
 
 		int angle_sunup, angle_sundown, angle_diff;
 

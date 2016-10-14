@@ -7,6 +7,7 @@
     "name": "astronomical-analog",
     "pebble": {
         "capabilities": [
+            "location",
             "configurable"
         ],
         "displayName": "Astronomical Analog",
@@ -18,7 +19,9 @@
             "low_res_time",
             "inverted",
             "east_to_west_orb_rotation",
-            "config_version"
+            "config_version",
+            "latitude",
+            "longitude"
         ],
         "projectType": "native",
         "resources": {
